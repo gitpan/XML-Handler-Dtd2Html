@@ -50,7 +50,7 @@ use strict;
 
 use vars qw($VERSION);
 
-$VERSION="0.40";
+$VERSION="0.41";
 
 sub new {
 	my $proto = shift;
@@ -407,7 +407,7 @@ sub _process_args {
 	$self->{flag_comment} = $hash{flag_comment};
 	$self->{flag_href} = $hash{flag_href};
 
-	$self->{now} = localtime();
+	$self->{now} = $hash{flag_date} ? localtime() : "";
 	$self->{generator} = "dtd2html " . $XML::Handler::Dtd2Html::VERSION . " (Perl " . $] . ")";
 
 	if (defined $hash{path_tmpl}) {

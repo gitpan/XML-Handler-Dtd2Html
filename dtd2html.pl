@@ -3,13 +3,25 @@
 use strict;
 
 use Getopt::Std;
+use Pod::Usage;
 use IO::File;
 use XML::SAX::Expat;
 use XML::SAX::Writer;
 use XML::Handler::Dtd2Html;
 
 my %opts;
-getopts('bCdfHMl:p:s:t:o:x:Z', \%opts);
+getopts('bCDdfHhMvl:p:s:t:o:x:Z', \%opts)
+		or pod2usage(-verbose => 0);
+
+if ($opts{h}) {
+	pod2usage(-verbose => 0);
+}
+
+if ($opts{v}) {
+	print "$0\n";
+	print "XML::Handler::Dtd2Html Version $XML::Handler::Dtd2Html::VERSION\n";
+	exit(0);
+}
 
 my $file = $ARGV[0];
 die "No input file\n"
@@ -60,6 +72,7 @@ if (exists $opts{d}) {
 			css				=> $opts{s},
 			examples		=> \@examples,
 			flag_comment	=> !exists($opts{C}),
+			flag_date		=> !exists($opts{D}),
 			flag_href		=> exists($opts{H}),
 			flag_multi		=> exists($opts{M}),
 			flag_zombi		=> exists($opts{Z}),
@@ -105,7 +118,7 @@ __END__
 
 dtd2html - Generate a HTML documentation from a DTD
 
-=head1 SYNOPSYS
+=head1 SYNOPSIS
 
 dtd2html [B<-b> | B<-f> | B<-d>] [B<-C> | B<-M>] [B<-HZ>] [B<-o> I<filename>] [B<-s> I<style>] [B<-t> I<title>] [B<-x> 'I<example1.xml> I<example2.xml> ...'] [B<-l> I<language> | B<-p> I<path>] I<file.xml>
 
@@ -121,6 +134,10 @@ Enable the book mode generation.
 
 Suppress all comments.
 
+=item -D
+
+Suppress date generation.
+
 =item -d
 
 Generate a clean DTD (without comment).
@@ -132,6 +149,10 @@ Enable the frame mode generation.
 =item -H
 
 Disable generation of href's in comments.
+
+=item -h
+
+Display help.
 
 =item -l
 
@@ -156,6 +177,10 @@ Generate an external I<style>.css file.
 =item -t
 
 Specify the title of the HTML files.
+
+=item -v
+
+Display Version.
 
 =item -x
 

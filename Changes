@@ -1,5 +1,8 @@
 Revision history for Perl extension XML::Handler::Dtd2Html.
 
+0.41  Wed Nov 12 12:30:00 2003
+	- add options : -h -v -D
+
 0.40  Mon Oct  6 12:30:00 2003
 	- base for XML::Handler::Dtd2DocBook
 	- option -C : re-works now
