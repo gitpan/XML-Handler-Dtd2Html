@@ -1,0 +1,9 @@
+Revision history for Perl extension XML::Handler::Dtd2Html.
+
+0.10  Thu Jul 11 19:30:00 2002
+	- first release
+
+0.01  Mon Jun 24 14:50:50 2002
+	- original version; created by h2xs 1.20 with options
+		-XA -n XML::Handler::Dtd2Html
+

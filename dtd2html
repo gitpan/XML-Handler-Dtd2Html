@@ -1,0 +1,68 @@
+#!/usr/bin/perl -w
+
+use strict;
+
+use IO::File;
+use XML::Parser::PerlSAX;
+use XML::Handler::Dtd2Html;
+
+my $handler = new XML::Handler::Dtd2Html();
+my $parser = new XML::Parser::PerlSAX(Handler => $handler, ParseParamEnt => 1);
+
+my $file = $ARGV[0];
+my $io = new IO::File($file,"r");
+die "Can't open $file ($!)\n"
+		unless (defined $io);
+
+my $doc = $parser->parse(Source => {ByteStream => $io});
+
+my $root = $doc->{root_name};
+$root =~ s/[:\.\-]/_/g;
+my $outfile = "dtd_" . $root . ".html";
+open OUT, "> $outfile"
+		or die "can't open $outfile ($!)\n";
+
+$doc->printToFileHandle(\*OUT);
+close OUT;
+
+__END__
+
+=head1 NAME
+
+dtd2html - Generate a HTML documentation from a DTD
+
+=head1 SYNOPSYS
+
+ dtd2html I<file>
+
+=head1 DESCRIPTION
+
+B<dtd2html> is a front-end for XML::Handler::Dtd2Html and its subclasses. It uses them
+to generate HTML documentation from DTD source.
+
+Because it uses XML::Parser and an external DTD is not a valid XML document, the input
+source must be an XML document with an internal DTD or an XML document that refers to
+an external DTD.
+
+The goal of this tool is to increase the level of documentation in DTD and to supply
+a more readable format for DTD.
+
+It is a tool for DTD users, not for writer.
+
+This tool needs XML::Parser::PerlSAX and XML::Parser modules.
+
+=head1 SEE ALSO
+
+PerlSAX.pod(3), XML::Handler::Dtd2Html
+
+ Extensible Markup Language (XML) <http://www.w3c.org/TR/REC-xml>
+
+=head1 AUTHOR
+
+Francois PERRAD, perrad@besancon.sema.slb.com
+
+=head1 COPYRIGHT
+
+This program is distributed under the Artistic License.
+
+=cut

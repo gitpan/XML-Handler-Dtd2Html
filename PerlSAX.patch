@@ -1,0 +1,8 @@
+142a143,146
+>     push (@xml_parser_options,
+> 	  ParseParamEnt => $self->{ParseOptions}{ParseParamEnt})
+> 	if (defined $self->{ParseOptions}{ParseParamEnt});
+>  
+540a545,546
+>  ParseParamEnt    If true, allows the external DTD to be read,
+>                   and parameter entities to be parsed and expanded.
