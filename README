@@ -18,7 +18,6 @@ Description:
 Prerequisites:
 --------------
     This tool needs XML::SAX::Expat and XML::Parser modules.
-    You must patch XML::SAX::Expat-0.35 with SAX-Expat.0.35.patch
 
 Build/Installation:
 -------------------

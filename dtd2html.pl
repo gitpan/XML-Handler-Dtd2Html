@@ -12,7 +12,7 @@ my %opts;
 getopts('bCdfHMl:p:s:t:o:x:Z', \%opts);
 
 die "incoherent version between dtd2html.pl and Dtd2Hmtl.pm\n"
-		unless ($XML::Handler::Dtd2Html::VERSION eq "0.30");
+		unless ($XML::Handler::Dtd2Html::VERSION eq "0.31");
 
 my $file = $ARGV[0];
 die "No input file\n"
@@ -30,11 +30,13 @@ if (exists $opts{d}) {
 				or die "can't open $outfile ($!).\n";
 	}
 	my $handler = new XML::SAX::Writer(Writer => 'DtdWriter', Output => \*STDOUT);
-	my $parser = new XML::SAX::Expat(Handler => $handler, ParseParamEnt => 1);
+	my $parser = new XML::SAX::Expat(Handler => $handler);
+	$parser->set_feature("http://xml.org/sax/features/external-general-entities", 1);
 	$parser->parse(Source => {ByteStream => $io});
 } else {
 	my $handler = new XML::Handler::Dtd2Html();
-	my $parser = new XML::SAX::Expat(Handler => $handler, ParseParamEnt => 1);
+	my $parser = new XML::SAX::Expat(Handler => $handler);
+	$parser->set_feature("http://xml.org/sax/features/external-general-entities", 1);
 	my $doc = $parser->parse(Source => {ByteStream => $io});
 
 	my $outfile;
@@ -99,6 +101,7 @@ sub end_dtd {
     $self->{Consumer}->output($dtd);
     $self->{BufferDTD} = '';
 }
+
 __END__
 
 =head1 NAME
@@ -123,7 +126,7 @@ Suppress all comments.
 
 =item -d
 
-Generate a clean DTD.
+Generate a clean DTD (without comment).
 
 =item -f
 

@@ -25,7 +25,7 @@ use strict;
 
 use vars qw($VERSION);
 
-$VERSION="0.30";
+$VERSION="0.31";
 
 sub new {
 	my $proto = shift;
@@ -39,6 +39,12 @@ sub new {
 }
 
 # Content Events (Basic)
+
+sub start_document {
+	my $self = shift;
+	my ($decl) = @_;
+	$self->{doc}->{xml_decl} = $decl if (%{$decl});
+}
 
 sub end_document {
 	my $self = shift;
@@ -149,11 +155,12 @@ sub comment {
 
 # SAX1 Events
 
-sub xml_decl {
-	my $self = shift;
-	my ($decl) = @_;
-	$self->{doc}->{xml_decl} = $decl;
-}
+# deprecated in favour of start_document (see XML::SAX::Expat 0.36)
+#sub xml_decl {
+#	my $self = shift;
+#	my ($decl) = @_;
+#	$self->{doc}->{xml_decl} = $decl;
+#}
 
 ###############################################################################
 
@@ -1597,7 +1604,8 @@ XML::Handler::Dtd2Html - SAX2 handler for generate a HTML documentation from a D
 
   $handler = new XML::Handler::Dtd2Html;
 
-  $parser = new XML::SAX::Expat(Handler => $handler, ParseParamEnt => 1);
+  $parser = new XML::SAX::Expat(Handler => $handler);
+  $parser->set_feature("http://xml.org/sax/features/external-general-entities", 1);
   $doc = $parser->parse( [OPTIONS] );
 
   $doc->GenerateHTML( [PARAMS] );

@@ -1,5 +1,9 @@
 Revision history for Perl extension XML::Handler::Dtd2Html.
 
+0.31  Tue Jul 15 12:30:00 2003
+	- use XML-SAX-Expat 0.37 that needs no patch
+	- modif fr/element.tmpl
+
 0.30  Tue Feb 11 12:30:00 2003
 	- refactoring with HTML::Template
 	- add -l option : select language of templates

@@ -5,7 +5,6 @@ Makefile.PL
 MANIFEST
 test.pl
 README
-SAX-Expat.0.35.patch
 sample/makefile
 sample/entry.ppd
 sample/sample.ppd

@@ -9,7 +9,7 @@ WriteMakefile(
                         'XML::Parser'           => 2.31,
                         'XML::SAX'              => 0.11,
                         'XML::SAX::Base'        => 1.00,
-                        'XML::SAX::Expat'       => 0.35,
+                        'XML::SAX::Expat'       => 0.37,
                         'XML::SAX::Writer'      => 0.44,
                         'HTML::Template'        => 0,
     },
