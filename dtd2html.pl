@@ -247,11 +247,7 @@ So, translation of the templates are welcome.
 
 =head1 SEE ALSO
 
-XML::SAX::Base , XML::SAX , XML::SAX::Expat , XML::Parser
-
-XML::Handler::Dtd2Html
-
-Extensible Markup Language (XML), E<lt>http://www.w3c.org/TR/REC-xmlE<gt>
+XML::Handler::Dtd2DocBook, dtd2db
 
 =head1 AUTHOR
 

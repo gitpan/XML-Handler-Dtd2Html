@@ -1,3 +1,4 @@
+
 package XML::Handler::Dtd2Html::Document;
 
 use Parse::RecDescent;
@@ -15,7 +16,9 @@ sub new {
 			hash_element            => {},
 			hash_attr               => {},
 			hlink                   => 1,
-			preformatted            => "pre"
+			preformatted            => "pre",
+			emphasis                => "em",
+			width                   => 80,
 	};
 	bless($self, $class);
 	$self->{cm_parser} = Parse::RecDescent->new(<<'EndGrammar');
@@ -47,7 +50,7 @@ use strict;
 
 use vars qw($VERSION);
 
-$VERSION="0.34";
+$VERSION="0.40";
 
 sub new {
 	my $proto = shift;
@@ -191,13 +194,13 @@ package XML::Handler::Dtd2Html::ContentModelVisitor;
 sub new {
 	my $proto = shift;
 	my $class = ref($proto) || $proto;
-	my ($handler) = @_;
+	my ($doc) = @_;
 	my $self = {
-			handler	=> $handler,
+			doc		=> $doc,
 			str		=> "",
 			raw		=> "",
 			tab		=> "",
-			max		=> 69,
+			max		=> $doc->{width},
 			need	=> 0,
 	};
 	bless($self, $class);
@@ -222,6 +225,16 @@ sub _add {
 	$self->{str} .= $str;
 }
 
+sub _add_name {
+	my $self = shift;
+	my ($raw, $str) = @_;
+	$str = $raw unless (defined $str);
+	$self->_break()
+			if (length($self->{tab} . $self->{raw} . $raw) > $self->{max});
+	$self->{raw} .= $raw;
+	$self->{str} .= $str;
+}
+
 sub _break {
 	my $self = shift;
 	$self->{need} = 0;
@@ -229,12 +242,6 @@ sub _break {
 		$self->{raw} = "";
 		$self->{str} .= "\n" . $self->{tab};
 	}
-}
-
-sub _check {
-	my $self = shift;
-	$self->_break()
-			if (length($self->{raw}) > $self->{max});
 }
 
 sub _visit {
@@ -255,7 +262,7 @@ sub visit_contentspec {
 	my ($node) = @_;
 
 	if      (exists $node->{__VALUE__}) {
-		$self->{str} .= $self->{handler}->_mk_value($node->{__VALUE__});
+		$self->{str} .= $self->{doc}->_mk_value($node->{__VALUE__});
 	} elsif (exists $node->{Mixed}) {
 		$self->_visit($node->{Mixed});
 	} elsif (exists $node->{children}) {
@@ -314,7 +321,6 @@ sub visit_choice {
 	$self->_visit($node->{cp}, 1);
 	foreach (@{$node->{'_alternation_1_of_production_1_of_rule_choice(s)'}}) {
 		$self->_add(" " . $_->{__STRING1__} . " ");			# '|'
-		$self->_check();
 		$self->_visit($_->{cp}, 0);
 	}
 	$self->_dec_tab();
@@ -331,7 +337,6 @@ sub visit_seq {
 	$self->_visit($node->{cp}, 1);
 	foreach (@{$node->{'_alternation_1_of_production_1_of_rule_seq(s?)'}}) {
 		$self->_add(" " . $_->{__STRING1__} . " ");			# ','
-		$self->_check();
 		$self->_visit($_->{cp}, 0);
 	}
 	$self->_dec_tab();
@@ -344,12 +349,11 @@ sub visit_Mixed {
 	my ($node) = @_;
 
 	$self->_add($node->{__STRING1__} . " ");				# '('
-	my $value = $self->{handler}->_mk_value($node->{__STRING2__});
+	my $value = $self->{doc}->_mk_value($node->{__STRING2__});
 	$self->_inc_tab();
-	$self->_add($node->{__STRING2__}, $value);				# '#PCDATA'
+	$self->_add_name($node->{__STRING2__}, $value);			# '#PCDATA'
 	foreach (@{$node->{'_alternation_1_of_production_1_of_rule_Mixed(s?)'}}) {
 		$self->_add(" " . $_->{__STRING1__} . " ");			# '|'
-		$self->_check();
 		$self->_visit($_->{Name});
 	}
 	$self->_dec_tab();
@@ -361,8 +365,8 @@ sub visit_Name {
 	my $self = shift;
 	my ($node) = @_;
 
-	my $anchor = $self->{handler}->_mk_text_anchor("elt", $node->{__VALUE__});
-	$self->_add($node->{__VALUE__}, $anchor);
+	my $anchor = $self->{doc}->_mk_text_anchor("elt", $node->{__VALUE__});
+	$self->_add_name($node->{__VALUE__}, $anchor);
 }
 
 ###############################################################################
@@ -397,6 +401,7 @@ sub _process_args {
 	$self->{css} = $hash{css};
 	$self->{examples} = $hash{examples};
 	$self->{dirname} = dirname($hash{outfile});
+	$self->{basename} = basename($hash{outfile});
 	$self->{filebase} = $hash{outfile};
 	$self->{filebase} =~ s/^([^\/]+\/)+//;
 	$self->{flag_comment} = $hash{flag_comment};
@@ -728,8 +733,7 @@ sub generateExampleIndex {
 
 sub _mk_tree {
 	my $self = shift;
-	my ($name,$depth) = @_;
-	my %done = ();
+	my ($name, $depth) = @_;
 
 	return if ($self->{hash_element}->{$name}->{done});
 	$self->{hash_element}->{$name}->{done} = 1;
@@ -737,14 +741,15 @@ sub _mk_tree {
 			unless (defined $self->{hash_element}->{$name}->{uses});
 	return unless (scalar keys %{$self->{hash_element}->{$name}->{uses}});
 
+	my %done = ();
 	$self->{_tree_depth} = $depth if ($depth > $self->{_tree_depth});
 	$self->{_tree} .= "<ul class='tree'>\n";
 	foreach (keys %{$self->{hash_element}->{$name}->{uses}}) {
 		next if ($_ eq $name);
 		next if (exists $done{$_});
 		$done{$_} = 1;
-		$self->{_tree} .= "  <li class='tree'>" . $self->_mk_index_anchor("elt",$_) . "\n";
-		$self->_mk_tree($_,$depth+1);
+		$self->{_tree} .= "  <li class='tree'>" . $self->_mk_index_anchor("elt", $_) . "\n";
+		$self->_mk_tree($_, $depth+1);
 		$self->{_tree} .= "  </li>\n";
 	}
 	$self->{_tree} .= "</ul>\n";
@@ -757,7 +762,7 @@ sub generateTree {
 	$self->{_tree} = "<ul class='tree'>\n";
 	$self->{_tree} .= "  <li class='tree'>" . $self->_mk_index_anchor("elt", $self->{root_name}) . "\n";
 	if (exists $self->{hash_element}->{$self->{root_name}}) {
-		$self->_mk_tree($self->{root_name},$self->{_tree_depth});
+		$self->_mk_tree($self->{root_name}, $self->{_tree_depth});
 	} else {
 		warn "$self->{root_name} declared in DOCTYPE is an unknown element.\n";
 	}
@@ -777,7 +782,7 @@ sub _get_doc {
 	my $name = $decl->{Name};
 	my @doc = ();
 	my @tag = ();
-	if (exists $decl->{comments}) {
+	if ($self->{flag_comment} and exists $decl->{comments}) {
 		foreach my $comment (@{$decl->{comments}}) {
 			my ($doc, $r_tags) = $self->_extract_doc($comment);
 			if (defined $doc) {
@@ -816,7 +821,7 @@ sub _get_doc_attrs {
 	my ($name) = @_;
 
 	my @doc_attrs = ();
-	if (exists $self->{hash_attr}->{$name}) {
+	if ($self->{flag_comment} and exists $self->{hash_attr}->{$name}) {
 		foreach my $attr (@{$self->{hash_attr}->{$name}}) {
 			if (exists $attr->{comments}) {
 				my @doc = ();
@@ -1037,7 +1042,7 @@ sub _process_example {
 
 sub _mk_example {
 	my $self = shift;
-	my ($example) = @_;
+	my ($example, $emphasis) = @_;
 
 	open IN, $example
 			or warn "can't open $example ($!)",
@@ -1047,8 +1052,10 @@ sub _mk_example {
 		s/&/&amp;/g;
 		s/</&lt;/g;
 		s/>/&gt;/g;
-		s/&lt;!--/<cite>&lt;!--/g;
-		s/--&gt;/--&gt;<\/cite>/g;
+		s/'/&apos;/g;
+		s/\"/&quot;/g;
+		s/&lt;!--/<$self->{emphasis}>&lt;!--/g;
+		s/--&gt;/--&gt;<\/$self->{emphasis}>/g;
 		$data .= $self->_process_example($_);
 	}
 	close IN;
@@ -1338,7 +1345,7 @@ sub _get_attributes {
 			if ($value) {
 				$value_default .= " \"" . $value . "\"";
 			}
-			$value_default = "&nbsp;" unless ($value_default);
+			$value_default = "&#160;" unless ($value_default);
 			push @attrs, {
 					attr_name	=> $attr->{aName},
 					is_enum		=> $is_enum,
@@ -1566,7 +1573,7 @@ sub GenerateHTML {
 		$self->{template} = new HTML::Template(
 				filename	=> $template,
 				path		=> $self->{path_tmpl},
-				loop_context_vars => 1,
+				loop_context_vars	=> 1,
 		);
 		die "can't create template with $template ($!).\n"
 				unless (defined $self->{template});
@@ -1944,8 +1951,6 @@ Francois Perrad, francois.perrad@gadz.org
 =head1 SEE ALSO
 
 dtd2html.pl
-
-Extensible Markup Language (XML), E<lt>http://www.w3c.org/TR/REC-xmlE<gt>
 
 =head1 COPYRIGHT
 
