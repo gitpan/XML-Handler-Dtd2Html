@@ -12,7 +12,7 @@ my %opts;
 getopts('bCdfHMs:t:o:x:Z', \%opts);
 
 die "incoherent version between dtd2html.pl and Dtd2Hmtl.pm\n"
-		unless ($XML::Handler::Dtd2Html::VERSION eq "0.22");
+		unless ($XML::Handler::Dtd2Html::VERSION eq "0.24");
 
 my $file = $ARGV[0];
 die "No input file\n"
