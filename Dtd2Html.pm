@@ -25,7 +25,7 @@ use strict;
 
 use vars qw($VERSION);
 
-$VERSION="0.21";
+$VERSION="0.22";
 
 sub new {
 	my $proto = shift;
@@ -210,15 +210,15 @@ sub _cross_ref {
 		my $model = $decl->{Model};
 		while ($model) {
 			for ($model) {
-				s/^([ \n\r\t\f\013]+)//;							# whitespaces
+				s/^[ \n\r\t\f\013]+//;							# whitespaces
 
-				s/^([\?\*\+\(\),\|])//
+				s/^[\?\*\+\(\),\|]//
 						and last;
-				s/^(EMPTY)//
+				s/^EMPTY//
 						and last;
-				s/^(ANY)//
+				s/^ANY//
 						and last;
-				s/^(#PCDATA)//
+				s/^#PCDATA//
 						and last;
 				s/^([A-Za-z_:][0-9A-Za-z\.\-_:]*)//
 						and $self->{hash_element}->{$name}->{uses}->{$1} = 1,
@@ -395,7 +395,6 @@ sub _process_text {
 		next if ($word =~ /^\s*$/);
 		next if ($word eq $current);
 		if ($word =~ /^[A-Za-z_:][0-9A-Za-z\.\-_:]*$/) {
-#			next if ($self->{flag_href} and !defined($href));
 			next if ($self->{flag_href} and !$href);
 			# looks like a DTD name
 			if (exists $self->{hash_notation}->{$word}) {
@@ -819,6 +818,9 @@ sub GenerateCSS {
 sub generateHTML {
 	my $self = shift;
 
+	warn "No element declaration captured.\n"
+			unless (scalar keys %{$self->{hash_element}});
+
 	$self->_parse_args(@_);
 
 	my $style = "      a.index {font-weight: bold}\n" .
@@ -842,10 +844,8 @@ sub generateHTML {
 	$self->generateAlphaNotation(\*OUT);
 	$self->generateExampleIndex(\*OUT);
 	print OUT "    <hr />\n";
-	if (scalar keys %{$self->{hash_element}}) {
-		$self->generateTree(\*OUT);
-		print OUT "    <hr />\n";
-	}
+	$self->generateTree(\*OUT);
+	print OUT "    <hr />\n";
 	$self->generateMain(\*OUT);
 	foreach (@{$self->{examples}}) {
 		print OUT "    <hr />\n";
@@ -893,6 +893,9 @@ sub _mk_index_anchor {
 
 sub generateHTML {
 	my $self = shift;
+
+	warn "No element declaration captured.\n"
+			unless (scalar keys %{$self->{hash_element}});
 
 	$self->_parse_args(@_);
 
@@ -1379,6 +1382,9 @@ sub _mk_filename {
 
 sub generateHTML {
 	my $self = shift;
+
+	warn "No element declaration captured.\n"
+			unless (scalar keys %{$self->{hash_element}});
 
 	$self->_parse_args(@_);
 

@@ -1,5 +1,8 @@
 Revision history for Perl extension XML::Handler::Dtd2Html.
 
+0.22  Wed Oct 16 12:30:00 2002
+	- fix in patch Expat for XML-SAX-Base v1.04
+
 0.21  Mon Oct  7 12:30:00 2002
 	- better Expat patch
 	- add -d option : generate a clean DTD

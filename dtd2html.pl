@@ -11,10 +11,13 @@ use XML::Handler::Dtd2Html;
 my %opts;
 getopts('bCdfHMs:t:o:x:Z', \%opts);
 
+die "incoherent version between dtd2html.pl and Dtd2Hmtl.pm\n"
+		unless ($XML::Handler::Dtd2Html::VERSION eq "0.22");
+
 my $file = $ARGV[0];
 die "No input file\n"
 		unless (defined $file);
-warn "Don't use directly a DTD file (see the embedded pod or the readme).\n"
+warn "Don't use directly a DTD file (see the embedded pod or the README).\n"
 		if ($file =~ /\.dtd$/i);
 my $io = new IO::File($file,"r");
 die "Can't open $file ($!)\n"
