@@ -25,7 +25,7 @@ use strict;
 
 use vars qw($VERSION);
 
-$VERSION="0.13";
+$VERSION="0.14";
 
 sub new {
 	my $proto = shift;
@@ -52,7 +52,8 @@ sub end_document {
 
 sub comment {
 	my $self = shift;
-	push @{$self->{comments}}, shift;
+	my ($comment) = @_;
+	push @{$self->{comments}}, $comment;
 }
 
 sub notation_decl {
@@ -71,6 +72,7 @@ sub notation_decl {
 sub unparsed_entity_decl {
 	my $self = shift;
 	my ($decl) = @_;
+	$self->{comments} = [];
 	my $name = $decl->{Name};
 	warn "unparsed entity $name.\n";
 #	warn "Please patch XML::Parser::PerlSAX v0.07 (see the embedded pod or the readme).\n";
@@ -126,6 +128,7 @@ sub doctype_decl {
 		$decl->{comments} = [@{$self->{comments}}];
 		$self->{comments} = [];
 	}
+	$decl->{type} = "doctype";
 	$self->{doc}->{doctype_decl} = $decl;
 	$self->{doc}->{root_name} = $decl->{Name};
 #	die "Please patch XML::Parser::PerlSAX v0.07 (see the embedded pod or the readme).\n"
@@ -141,8 +144,7 @@ sub xml_decl {
 
 package XML::Handler::Dtd2Html::Document;
 
-sub version {
-	my $self = shift;
+sub version () {
 	return $XML::Handler::Dtd2Html::VERSION;
 }
 
@@ -282,6 +284,54 @@ sub _format_content_model {
 	return $str;
 }
 
+sub _include_doc {
+	my $self = shift;
+	my($filename) = @_;
+	my $doc = "";
+
+	open IN, $filename
+			or warn "can't open $filename ($!).\n",
+			return $doc;
+
+	while (<IN>) {
+		$doc .= $_;
+	}
+	close IN;
+	return $doc;
+}
+
+sub _extract_doc {
+	my $self = shift;
+	my($comment) = @_;
+	my $doc = undef;
+	my @tags = ();
+	my @lines = split /\n/, $comment->{Data};
+	foreach (@lines) {
+		if      (/^\s*@\s*([\s0-9A-Z_a-z]+):\s*(.*)/) {
+			my $tag = $1;
+			my $value = $2;
+			$tag =~ s/\s*$//;
+			if ($tag =~ /INCLUDE/) {
+				$doc .= $self->_include_doc($value);
+			} else {
+				push @tags, [$tag, $value];
+			}
+		} elsif (/^\s*@\s*([A-Z_a-z][0-9A-Z_a-z]*)\s+(.*)/) {
+			my $tag = $1;
+			my $value = $2;
+			if ($tag =~ /INCLUDE/) {
+				$doc .= $self->_include_doc($value);
+			} else {
+				push @tags, [$tag, $value];
+			}
+		} else {
+			$doc .= $_;
+			$doc .= "\n";
+		}
+	}
+	return ($doc, \@tags);
+}
+
 sub _mk_text_anchor {
 	my $self = shift;
 	my($type, $name) = @_;
@@ -314,6 +364,20 @@ sub _process_text {
 			}
 			elsif (exists $self->{hash_element}->{$word}) {
 				$word = $self->_mk_text_anchor("elt", $word);
+			}
+		} elsif ($word =~ /^&lt;([A-Za-z_:][0-9A-Za-z\.\-_:]*)(&gt;[\S]*)?$/) {
+			# looks like a DTD name, in example file
+			if (exists $self->{hash_notation}->{$1}) {
+				$word = "&lt;" . $self->_mk_text_anchor("not", $1);
+				$word .= $2 if (defined $2);
+			}
+			elsif (exists $self->{hash_entity}->{$1}) {
+				$word = "&lt;" . $self->_mk_text_anchor("ent", $1);
+				$word .= $2 if (defined $2);
+			}
+			elsif (exists $self->{hash_element}->{$1}) {
+				$word = "&lt;" . $self->_mk_text_anchor("elt", $1);
+				$word .= $2 if (defined $2);
 			}
 		} elsif ($word =~ /^\w+:\/\/\w/) {
 			# looks like a URL
@@ -384,6 +448,23 @@ sub generateAlphaNotation {
 		print $FH "<dl>\n";
 		foreach (@notations) {
 			print $FH "    <dt>",$self->_mk_index_anchor("not",$_),"</dt>\n";
+		}
+		print $FH "</dl>\n";
+	} elsif (defined $empty) {
+		print $FH "<h2>Notations index.</h2>\n";
+		print $FH "<dl><dt>NONE</dt></dl>\n";
+	}
+}
+
+sub generateExampleIndex {
+	my $self = shift;
+	my ($FH, $examples, $empty) = @_;
+
+	if (scalar @{$examples}) {
+		print $FH "<h2>Examples list.</h2>\n";
+		print $FH "<dl>\n";
+		foreach (@{$examples}) {
+			print $FH "    <dt>",$self->_mk_index_anchor("ex",$_),"</dt>\n";
 		}
 		print $FH "</dl>\n";
 	} elsif (defined $empty) {
@@ -547,10 +628,15 @@ sub generateMain {
 			warn __PACKAGE__,":generateMain INTERNAL_ERROR (type:$type)\n";
 		}
 		if ($self->{flag_comment}) {
+			my @all_tags = ();
 			if (exists $decl->{comments}) {
 				foreach my $comment (@{$decl->{comments}}) {
-					my $data = $self->_process_text($comment->{Data});
-					print $FH "    <p class='comment'>",$data,"</p>\n";
+					my ($doc, $r_tags) = $self->_extract_doc($comment);
+					if (defined $doc) {
+						my $data = $self->_process_text($doc);
+						print $FH "    <p class='comment'>",$data,"</p>\n";
+					}
+					push @all_tags, @{$r_tags};
 				}
 			}
 			if ($type eq "element" and exists $self->{hash_attr}->{$name}) {
@@ -563,20 +649,39 @@ sub generateMain {
 					foreach my $attr (@{$self->{hash_attr}->{$name}}) {
 						if (exists $attr->{comments}) {
 							my $attr_name = $attr->{AttributeName};
+							my @all_attr_tags = ();
 							print $FH "    <li>",$attr_name," : <span class='comment'>\n";
 							my $first = 1;
 							foreach my $comment (@{$attr->{comments}}) {
-								my $data = $self->_process_text($comment->{Data});
-								print $FH "<p>\n" unless ($first);
-								print $FH $data,"\n";
-								print $FH "</p>\n" unless ($first);
-								$first = 0;
+								my ($doc, $r_tags) = $self->_extract_doc($comment);
+								if (defined $doc) {
+									my $data = $self->_process_text($doc);
+									print $FH "<p>\n" unless ($first);
+									print $FH $data,"\n";
+									print $FH "</p>\n" unless ($first);
+									$first = 0;
+								}
+								push @all_attr_tags, @{$r_tags};
 							}
-							print $FH "    </span></li>\n";
+							print $FH "    </span>\n";
+							foreach my $tag (@all_attr_tags) {
+								my $entry = ${$tag}[0];
+								my $data = ${$tag}[1];
+								$data = $self->_process_text($data);
+								print $FH "<p>",$entry," : <span class='comment'>",$data,"</span></p>\n";
+							}
+							print $FH "    </li>\n";
 						}
 					}
 					print $FH "  </ul>\n";
 				}
+			}
+			foreach my $tag (@all_tags) {
+				my $entry = ${$tag}[0];
+				my $data = ${$tag}[1];
+				$data = $self->_process_text($data);
+				print $FH "  <h4>",$entry,"</h4>\n";
+				print $FH "  <p><span class='comment'>",$data,"</span></p>\n";
 			}
 		}
 		if ($type eq "element") {
@@ -595,12 +700,33 @@ sub generateMain {
 	print $FH "</ul>\n";
 }
 
+sub generateExample {
+	my $self = shift;
+	my ($FH,$example) = @_;
+
+	open IN, $example
+			or warn "can't open $example ($!)",
+			return;
+	print $FH "<pre>\n";
+	while (<IN>) {
+		s/&/&amp;/g;
+		s/</&lt;/g;
+		s/>/&gt;/g;
+		s/&lt;!--/<cite>&lt;!--/g;
+		s/--&gt;/--&gt;<\/cite>/g;
+		my $data = $self->_process_text($_);
+		print $FH $data;
+	};
+	close IN;
+	print $FH "</pre>\n";
+}
+
 sub GenerateCSS {
 	my $self = shift;
 	my ($outfile, $style) = @_;
 
 	$outfile =~ s/(\/[^\/]+)$//;
-	$outfile .= "/" . $self->{css}; 
+	$outfile .= "/" . $self->{css};
 
 	open OUT, "> $outfile.css"
 			or die "can't open $outfile.css ($!)\n";
@@ -610,7 +736,7 @@ sub GenerateCSS {
 
 sub generateHTML {
 	my $self = shift;
-	my ($outfile, $title, $css, $flag_comment, $flag_multi, $flag_zombi) = @_;
+	my ($outfile, $title, $css, $examples, $flag_comment, $flag_multi, $flag_zombi) = @_;
 
 	$title = "DTD " . $self->{root_name}
 			unless (defined $title);
@@ -641,12 +767,18 @@ sub generateHTML {
 	$self->generateAlphaElement(\*OUT);
 	$self->generateAlphaEntity(\*OUT);
 	$self->generateAlphaNotation(\*OUT);
+	$self->generateExampleIndex(\*OUT,$examples);
 	print OUT "    <hr />\n";
 	if (scalar keys %{$self->{hash_element}}) {
 		$self->generateTree(\*OUT);
 		print OUT "    <hr />\n";
 	}
 	$self->generateMain(\*OUT);
+	foreach (@{$examples}) {
+		print OUT "    <hr />\n";
+		print OUT "    <h3><a id='ex_",$_,"' name='ex_",$_,"'/>Example ",$_," :</h3>\n";
+		$self->generateExample(\*OUT,$_);
+	}
 	print OUT "    <hr />\n";
 	print OUT "    <div><cite>Generated by dtd2html</cite></div>\n";
 	print OUT "\n";
@@ -688,7 +820,7 @@ sub _mk_index_anchor {
 
 sub generateHTML {
 	my $self = shift;
-	my ($outfile, $title, $css, $flag_comment, $flag_multi, $flag_zombi) = @_;
+	my ($outfile, $title, $css, $examples, $flag_comment, $flag_multi, $flag_zombi) = @_;
 
 	$title = "DTD " . $self->{root_name}
 			unless (defined $title);
@@ -736,6 +868,7 @@ sub generateHTML {
 	$self->generateAlphaElement(\*OUT);
 	$self->generateAlphaEntity(\*OUT);
 	$self->generateAlphaNotation(\*OUT);
+	$self->generateExampleIndex(\*OUT,$examples);
 	print OUT "  </body>\n";
 	$self->_format_tail(\*OUT);
 	close OUT;
@@ -756,6 +889,11 @@ sub generateHTML {
 	print OUT "    <h1>",$title,"</h1>\n";
 	print OUT "    <hr />\n";
 	$self->generateMain(\*OUT);
+	foreach (@{$examples}) {
+		print OUT "    <hr />\n";
+		print OUT "    <h3><a id='ex_",$_,"' name='ex_",$_,"'/>Example ",$_," :</h3>\n";
+		$self->generateExample(\*OUT,$_);
+	}
 	print OUT "    <hr />\n";
 	print OUT "    <div><cite>Generated by dtd2html</cite></div>\n";
 	print OUT "  </body>\n";
@@ -878,6 +1016,9 @@ sub generatePageFooter {
 	print $FH "      </td>\n";
 	print $FH "      <td align='right' valign='top'>",($next ? $next : "&nbsp;"),"</td>\n";
 	print $FH "    </tr>\n";
+	print $FH "    <tr>\n";
+	print $FH "      <td colspan='3' align='center'><cite>--- Generated by dtd2html ---</cite></td>\n";
+	print $FH "    </tr>\n";
 	print $FH "  </table>\n";
 	print $FH "</div>\n";
 }
@@ -977,6 +1118,8 @@ sub generatePage {
 				my $attr_name = $attr->{AttributeName};
 				my $type = $attr->{Type};
 				my $default = $attr->{Default};
+				$default =~ s/^['"]//;
+				$default =~ s/['"]$//;
 				my $fixed = $attr->{Fixed};
 				$default = "#FIXED " . $default if (defined $fixed);
 				print $FH "<tr><td>",$attr_name,"</td><td>",$type,"</td><td>",$default,"</td></tr>\n";
@@ -989,11 +1132,16 @@ sub generatePage {
 		warn __PACKAGE__,":generatePage INTERNAL_ERROR (type:$type)\n";
 	}
 	if ($self->{flag_comment}) {
+		my @all_tags = ();
 		print $FH "<h2>Description</h2>\n";
 		if (exists $decl->{comments}) {
 			foreach my $comment (@{$decl->{comments}}) {
-				my $data = $self->_process_text($comment->{Data});
-				print $FH "    <p>",$data,"</p>\n";
+				my ($doc, $r_tags) = $self->_extract_doc($comment);
+				if (defined $doc) {
+					my $data = $self->_process_text($doc);
+					print $FH "  <p>",$data,"</p>\n";
+				}
+				push @all_tags, @{$r_tags};
 			}
 		}
 		if ($type eq "element" and exists $self->{hash_attr}->{$name}) {
@@ -1006,9 +1154,21 @@ sub generatePage {
 				foreach my $attr (@{$self->{hash_attr}->{$name}}) {
 					if (exists $attr->{comments}) {
 						my $attr_name = $attr->{AttributeName};
+						my @all_attr_tags = ();
 						print $FH "    <li><h4>",$attr_name,"</h4>\n";
 						foreach my $comment (@{$attr->{comments}}) {
-							my $data = $self->_process_text($comment->{Data});
+							my ($doc, $r_tags) = $self->_extract_doc($comment);
+							if (defined $doc) {
+								my $data = $self->_process_text($doc);
+								print $FH "      <p>",$data,"</p>\n";
+							}
+							push @all_attr_tags, @{$r_tags};
+						}
+						foreach my $tag (@all_attr_tags) {
+							my $entry = ${$tag}[0];
+							my $data = ${$tag}[1];
+							$data = $self->_process_text($data);
+							print $FH "      <h4>",$entry,"</h4>\n";
 							print $FH "      <p>",$data,"</p>\n";
 						}
 						print $FH "    </li>\n";
@@ -1016,6 +1176,13 @@ sub generatePage {
 				}
 				print $FH "  </ul>\n";
 			}
+		}
+		foreach my $tag (@all_tags) {
+			my $entry = ${$tag}[0];
+			my $data = ${$tag}[1];
+			$data = $self->_process_text($data);
+			print $FH "  <h3>",$entry,"</h3>\n";
+			print $FH "  <p>",$data,"</p>\n";
 		}
 	}
 	print $FH "<!-- HERE, insert extra data -->\n";
@@ -1100,14 +1267,14 @@ sub _mk_filename {
 	my $self = shift;
 	my ($name) = @_;
 	return $name unless (exists $self->{not_sensitive});
-	$name =~ s/([A-Z])/$1_/g;  
+	$name =~ s/([A-Z])/$1_/g;
 	$name =~ s/([a-z])/_$1/g;
-	return $name;  
+	return $name;
 }
 
 sub generateHTML {
 	my $self = shift;
-	my ($outfile, $title, $css, $flag_comment, $flag_multi, $flag_zombi) = @_;
+	my ($outfile, $title, $css, $examples, $flag_comment, $flag_multi, $flag_zombi) = @_;
 	my $links;
 
 	$title = "DTD " . $self->{root_name}
@@ -1123,7 +1290,7 @@ sub generateHTML {
 	$self->{flag_comment} = $flag_comment;
 
 	my $style = "      a.index {font-weight: bold}\n" .
-	            "      hr {text-align: center}\n" . 
+	            "      hr {text-align: center}\n" .
 	            "      table.synopsys {background-color: #DCDCDC}\n" .	# gainsboro
 	            "      td.title {font-style: italic}\n";
 
@@ -1135,25 +1302,47 @@ sub generateHTML {
 	$self->_format_head(\*OUT, $title, $style);
 	print OUT "  <body>\n";
 	$self->generatePageHeader(\*OUT, $title, "", "", "", "");
+	print OUT "<h2><a href='",$self->{filebase},".book.",$self->_mk_filename("overview"),".html'>Overview</a></h2>\n";
 	print OUT "<h2><a href='",$self->{filebase},".book.",$self->_mk_filename("elements_index"),".html'>Elements index.</a></h2>\n";
 	print OUT "<h2><a href='",$self->{filebase},".book.",$self->_mk_filename("entities_index"),".html'>Entities index.</a></h2>\n";
 	print OUT "<h2><a href='",$self->{filebase},".book.",$self->_mk_filename("notations_index"),".html'>Notations index.</a></h2>\n";
+	print OUT "<h2><a href='",$self->{filebase},".book.",$self->_mk_filename("examples_list"),".html'>Examples list.</a></h2>\n";
+	print OUT "<hr />\n";
 	$self->generateTree(\*OUT);
 	$self->generatePageFooter(\*OUT, "", "", "", "", "");
 	print OUT "  </body>\n";
 	$self->_format_tail(\*OUT);
 	close OUT;
 
-	$filename = $self->_mk_outfile($outfile,"book","elements_index");
+	$filename = $self->_mk_outfile($outfile,"book","overview");
+	if (-e $filename) {
+		unlink($filename . ".sav");
+		rename($filename, $filename . ".sav");
+	}
 	$links = $self->_mk_link("Prev", $title, "book", "home");
+	$links .= $self->_mk_link("Next", "Elements index.", "book", "elements index");
+	open OUT, "> $filename"
+			or die "can't open $filename ($!)\n";
+	$self->_format_head(\*OUT, $title, $style);
+	print OUT "  <body>\n";
+	$self->generatePageHeader(\*OUT, $title, "book", "home", "book", "elements index");
+	print OUT "  <h1>Overview</h1>\n";
+	print OUT "  <cite>This page could be completed by any HTML composer.</cite>\n";
+	$self->generatePageFooter(\*OUT, "book", "home", "book", "elements index", "home");
+	print OUT "  </body>\n";
+	$self->_format_tail(\*OUT);
+	close OUT;
+
+	$filename = $self->_mk_outfile($outfile,"book","elements_index");
+	$links = $self->_mk_link("Prev", $title, "book", "overview");
 	$links .= $self->_mk_link("Next", "Entities index.", "book", "entities index");
 	open OUT, "> $filename"
 			or die "can't open $filename ($!)\n";
 	$self->_format_head(\*OUT, "Elements Index.", $style, $links);
 	print OUT "  <body>\n";
-	$self->generatePageHeader(\*OUT, $title, "book", "home", "book", "entities index");
+	$self->generatePageHeader(\*OUT, $title, "book", "overview", "book", "entities index");
 	$self->generateAlphaElement(\*OUT, 1);
-	$self->generatePageFooter(\*OUT, "book", "home", "book", "entities index", "home");
+	$self->generatePageFooter(\*OUT, "book", "overview", "book", "entities index", "home");
 	print OUT "  </body>\n";
 	$self->_format_tail(\*OUT);
 	close OUT;
@@ -1246,13 +1435,14 @@ sub generateHTML {
 
 	$filename = $self->_mk_outfile($outfile,"book","notations_index");
 	$links = $self->_mk_link("Prev", "Entities index.", "book", "entities index");
+	$links .= $self->_mk_link("Next", "Examples list.", "book", "examples list");
 	open OUT, "> $filename"
 			or die "can't open $filename ($!)\n";
 	$self->_format_head(\*OUT, "Notations Index.", $style, $links);
 	print OUT "  <body>\n";
-	$self->generatePageHeader(\*OUT, $title, "book", "entities index", "", "");
+	$self->generatePageHeader(\*OUT, $title, "book", "entities index", "book", "examples list");
 	$self->generateAlphaNotation(\*OUT, 1);
-	$self->generatePageFooter(\*OUT, "book", "entities index", "", "", "home");
+	$self->generatePageFooter(\*OUT, "book", "entities index", "book", "examples list", "home");
 	print OUT "  </body>\n";
 	$self->_format_tail(\*OUT);
 	close OUT;
@@ -1292,6 +1482,56 @@ sub generateHTML {
 			$first = 0;
 		}
 	}
+
+	$filename = $self->_mk_outfile($outfile,"book","examples_list");
+	$links = $self->_mk_link("Prev", "Notations index.", "book", "notations index");
+	open OUT, "> $filename"
+			or die "can't open $filename ($!)\n";
+	$self->_format_head(\*OUT, "Examples List.", $style, $links);
+	print OUT "  <body>\n";
+	$self->generatePageHeader(\*OUT, $title, "book", "notations index", "", "");
+	$self->generateExampleIndex(\*OUT,$examples, 1);
+	$self->generatePageFooter(\*OUT, "book", "notations index", "", "", "home");
+	print OUT "  </body>\n";
+	$self->_format_tail(\*OUT);
+	close OUT;
+
+	my @examples = @{$examples};
+	if (scalar @examples) {
+		my @prevs = @examples;
+		my @nexts = @examples;
+		pop @prevs;
+		unshift @prevs, "examples list";
+		shift @nexts;
+		push @nexts, "";
+		my $first = 1;
+		foreach (@examples) {
+			my $type_p = $first ? "book" : "ex";
+			my $type_n = "ex";
+			my $prev = shift @prevs;
+			my $next = shift @nexts;
+			my $filename = $self->_mk_outfile($outfile,$type_n,$_);
+			if ($first) {
+				$links = $self->_mk_link("Prev", "Examples list.", $type_p, $prev);
+			} else {
+				$links = $self->_mk_link("Prev", "Example " . $prev, $type_p, $prev);
+			}
+			$links .= $self->_mk_link("Next", "Example " . $next, $type_n, $next);
+			open OUT, "> $filename"
+					or die "can't open $filename ($!)\n";
+			$self->_format_head(\*OUT, "Example " . $_, $style, $links);
+			print OUT "  <body>\n";
+			$self->generatePageHeader(\*OUT, $title, $type_p, $prev, $type_n, $next);
+			print OUT "<h1>",$_,"</h1>\n";
+			$self->generateExample(\*OUT, $_);
+			$self->generatePageFooter(\*OUT, $type_p, $prev, $type_n, $next, "examples list");
+			print OUT "  </body>\n";
+			$self->_format_tail(\*OUT);
+			close OUT;
+			$first = 0;
+		}
+	}
+
 }
 
 1;
@@ -1312,7 +1552,7 @@ XML::Handler::Dtd2Html - PerlSAX handler for generate a HTML documentation from 
   $my_parser = new XML::Parser::PerlSAX(Handler => $my_handler, ParseParamEnt => 1);
   $result = $my_parser->parse( [OPTIONS] );
 
-  $result->generateHTML($outfile, $title, $flag_comment, $flag_multi, $flag_zombi);
+  $result->generateHTML($outfile, $title, $css, $r_examples, $flag_comment, $flag_multi, $flag_zombi);
 
 =head1 DESCRIPTION
 
@@ -1328,9 +1568,11 @@ Francois Perrad, francois.perrad@gadz.org
 
 PerlSAX.pod(3)
 
- Extensible Markup Language (XML) <http://www.w3c.org/TR/REC-xml>
+Extensible Markup Language (XML), E<lt>http://www.w3c.org/TR/REC-xmlE<gt>
 
 =head1 COPYRIGHT
+
+(c) 2002 Francois PERRAD, France. All rights reserved.
 
 This program is distributed under the Artistic License.
 

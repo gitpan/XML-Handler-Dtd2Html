@@ -1,5 +1,10 @@
 Revision history for Perl extension XML::Handler::Dtd2Html.
 
+0.14  Mon Sep 16 08:30:00 2002
+	- add tag in XML comment, special tag @INCLUDE
+	- add -x option : include example files
+	- add targets in sample/makefile
+
 0.13  Thu Sep  5 20:30:00 2002
 	- suppress patch check
 	- bug in book mode : swap between children and parents
