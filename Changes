@@ -1,5 +1,10 @@
 Revision history for Perl extension XML::Handler::Dtd2Html.
 
+0.11  Wed Aug 14 18:30:00 2002
+	- add a sample
+	- add options : frame mode, comment filter, ...
+	- generate XHTML Strict
+
 0.10  Thu Jul 11 19:30:00 2002
 	- first release
 

@@ -2,28 +2,35 @@
 
 use strict;
 
+use Getopt::Std;
 use IO::File;
 use XML::Parser::PerlSAX;
 use XML::Handler::Dtd2Html;
+
+my %opts;
+getopts('CfMt:o:Z', \%opts);
 
 my $handler = new XML::Handler::Dtd2Html();
 my $parser = new XML::Parser::PerlSAX(Handler => $handler, ParseParamEnt => 1);
 
 my $file = $ARGV[0];
+die "No input file\n"
+		unless (defined $file);
 my $io = new IO::File($file,"r");
 die "Can't open $file ($!)\n"
 		unless (defined $io);
 
 my $doc = $parser->parse(Source => {ByteStream => $io});
 
-my $root = $doc->{root_name};
-$root =~ s/[:\.\-]/_/g;
-my $outfile = "dtd_" . $root . ".html";
-open OUT, "> $outfile"
-		or die "can't open $outfile ($!)\n";
-
-$doc->printToFileHandle(\*OUT);
-close OUT;
+my $outfile;
+if (exists $opts{o}) {
+	$outfile = $opts{o};
+} else {
+	my $root = $doc->{root_name};
+	$root =~ s/[:\.\-]/_/g;
+	$outfile = "dtd_" . $root;
+}
+$doc->generateHTML($outfile, $opts{f}, $opts{t}, !exists($opts{C}), exists($opts{M}), exists($opts{Z}));
 
 __END__
 
@@ -33,7 +40,37 @@ dtd2html - Generate a HTML documentation from a DTD
 
 =head1 SYNOPSYS
 
- dtd2html I<file>
+dtd2html [B<-CfMZ>] [B<-o> I<filename>] [B<-t> I<title>] I<xml_file>
+
+=head1 OPTIONS
+
+=over 8
+
+=item -C
+
+Suppress all comments.
+
+=item -f
+
+Enable the frameset mode.
+
+=item -M
+
+Suppress multi comments, preserve the last.
+
+=item -o
+
+Specify the HTML filename to create.
+
+=item -t
+
+Specify the title of the resulting HTML file.
+
+=item -Z
+
+Delete zombi element (without parent).
+
+=back
 
 =head1 DESCRIPTION
 
@@ -47,9 +84,13 @@ an external DTD.
 The goal of this tool is to increase the level of documentation in DTD and to supply
 a more readable format for DTD.
 
-It is a tool for DTD users, not for writer.
+I<It is a tool for DTD users, not for writer.>
 
-This tool needs XML::Parser::PerlSAX and XML::Parser modules.
+All comments before a declaration are captured.
+
+All entity references inside attribute values are expanded.
+
+This tool needs XML::Parser::PerlSAX (libxml-perl) and XML::Parser modules.
 
 =head1 SEE ALSO
 
@@ -59,7 +100,7 @@ PerlSAX.pod(3), XML::Handler::Dtd2Html
 
 =head1 AUTHOR
 
-Francois PERRAD, perrad@besancon.sema.slb.com
+Francois PERRAD, francois.perrad@gadz.org
 
 =head1 COPYRIGHT
 

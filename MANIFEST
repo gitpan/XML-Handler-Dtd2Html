@@ -6,3 +6,7 @@ MANIFEST
 test.pl
 README
 PerlSAX.patch
+sample/makefile
+sample/sample.ppd
+sample/ppd.dtd
+sample/ppd.html
