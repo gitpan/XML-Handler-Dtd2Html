@@ -10,3 +10,5 @@ book:
 	mkdir book
 	dtd2html.pl -b -t "Perl Package Distrubtion" -o book/ppd -s style -x sample.ppd entry.ppd
 
+dtd:
+	dtd2html.pl -d -o out.dtd entry.ppd

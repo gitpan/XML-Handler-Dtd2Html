@@ -5,13 +5,11 @@ use strict;
 use Getopt::Std;
 use IO::File;
 use XML::SAX::Expat;
+use XML::SAX::Writer;
 use XML::Handler::Dtd2Html;
 
 my %opts;
-getopts('bCfHMs:t:o:x:Z', \%opts);
-
-my $handler = new XML::Handler::Dtd2Html();
-my $parser = new XML::SAX::Expat(Handler => $handler, ParseParamEnt => 1);
+getopts('bCdfHMs:t:o:x:Z', \%opts);
 
 my $file = $ARGV[0];
 die "No input file\n"
@@ -22,29 +20,71 @@ my $io = new IO::File($file,"r");
 die "Can't open $file ($!)\n"
 		unless (defined $io);
 
-my $doc = $parser->parse(Source => {ByteStream => $io});
-
-my $outfile;
-if (exists $opts{o}) {
-	$outfile = $opts{o};
+if (exists $opts{d}) {
+	if (exists $opts{o}) {
+		my $outfile = $opts{o};
+		open STDOUT, "> $outfile"
+				or die "can't open $outfile ($!).\n";
+	}
+	my $handler = new XML::SAX::Writer(Writer => 'DtdWriter', Output => \*STDOUT);
+	my $parser = new XML::SAX::Expat(Handler => $handler, ParseParamEnt => 1);
+	$parser->parse(Source => {ByteStream => $io});
 } else {
-	my $root = $doc->{root_name};
-	$root =~ s/[:\.\-]/_/g;
-	$outfile = "dtd_" . $root;
+	my $handler = new XML::Handler::Dtd2Html();
+	my $parser = new XML::SAX::Expat(Handler => $handler, ParseParamEnt => 1);
+	my $doc = $parser->parse(Source => {ByteStream => $io});
+
+	my $outfile;
+	if (exists $opts{o}) {
+		$outfile = $opts{o};
+	} else {
+		my $root = $doc->{root_name};
+		$root =~ s/[:\.\-]/_/g;
+		$outfile = "dtd_" . $root;
+	}
+
+	my @examples = ();
+	@examples = split /\s+/, $opts{x} if (exists $opts{x});
+
+	if      ($opts{b}) {
+		bless($doc, "XML::Handler::Dtd2Html::DocumentBook");
+	} elsif ($opts{f}) {
+		bless($doc, "XML::Handler::Dtd2Html::DocumentFrame");
+	}
+
+	$doc->generateHTML($outfile, $opts{t}, $opts{s}, \@examples, !exists($opts{C}), exists($opts{H}), exists($opts{M}), exists($opts{Z}));
 }
 
-my @examples = ();
-@examples = split /\s+/, $opts{x}
-		if (exists $opts{x});
+package DtdWriter;
 
-if      ($opts{b}) {
-	bless($doc, "XML::Handler::Dtd2Html::DocumentBook");
-} elsif ($opts{f}) {
-	bless($doc, "XML::Handler::Dtd2Html::DocumentFrame");
+use base qw(XML::SAX::Writer::XML);
+
+sub start_element {}
+sub end_element {}
+sub characters {}
+sub processing_instruction {}
+sub ignorable_whitespace {}
+sub comment {}
+sub start_cdata {}
+sub end_cdata {}
+sub start_entity {}
+sub end_entity {}
+sub xml_decl {}
+
+sub start_dtd {
+    my $self = shift;
+
+    $self->{BufferDTD} = '';
 }
 
-$doc->generateHTML($outfile, $opts{t}, $opts{s}, \@examples, !exists($opts{C}), exists($opts{H}), exists($opts{M}), exists($opts{Z}));
+sub end_dtd {
+    my $self = shift;
 
+    my $dtd = $self->{BufferDTD};
+    $dtd = $self->{Encoder}->convert($dtd);
+    $self->{Consumer}->output($dtd);
+    $self->{BufferDTD} = '';
+}
 __END__
 
 =head1 NAME
@@ -53,7 +93,7 @@ dtd2html - Generate a HTML documentation from a DTD
 
 =head1 SYNOPSYS
 
-dtd2html [B<-b> | B<-f>] [B<-C> | B<-M>] [B<-HZ>] [B<-o> I<filename>] [B<-s> I<style>] [B<-t> I<title>] [B<-x> 'I<example1.xml> I<example2.xml> ...'] I<file.xml>
+dtd2html [B<-b> | B<-f> | B<-d>] [B<-C> | B<-M>] [B<-HZ>] [B<-o> I<filename>] [B<-s> I<style>] [B<-t> I<title>] [B<-x> 'I<example1.xml> I<example2.xml> ...'] I<file.xml>
 
 =head1 OPTIONS
 
@@ -66,6 +106,10 @@ Enable the book mode generation.
 =item -C
 
 Suppress all comments.
+
+=item -d
+
+Generate a clean DTD.
 
 =item -f
 
@@ -81,7 +125,7 @@ Suppress multi comments, preserve the last.
 
 =item -o
 
-Specify the HTML filename to create.
+Specify the output.
 
 =item -s
 
@@ -144,7 +188,7 @@ So you must use entities &lt; &gt; &amp; within a comment.
 B<dtd2html> parses tags that are recognized when they are embedded
 within an XML comment. These doc tags enable you to autogenerate a
 complete, well-formatted document from your XML source. The tags start with
-an @.
+an @. The tags with two @ forces href generation.
 
 Tags must start at the beginning of a line.
 
@@ -156,7 +200,7 @@ The special tag @INCLUDE allows inclusion of the content of an external file.
    comments
    @Version : 1.0
    @INCLUDE : description.txt
-   @See Also : REC-xml
+   @@See Also : REC-xml
  -->
 
 =head1 SEE ALSO

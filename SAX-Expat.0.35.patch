@@ -6,3 +6,9 @@
 >          if (defined $opt->{ParseParamEnt});
 > 
 >     my $expat = XML::Parser->new(@xml_parser_options);
+197a202
+>         $ns = '' unless (defined $ns);
+203c208
+<                                     NamespaceURI => $ns || '',
+---
+>                                     NamespaceURI => $ns,

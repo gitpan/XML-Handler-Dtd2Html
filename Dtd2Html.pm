@@ -25,7 +25,7 @@ use strict;
 
 use vars qw($VERSION);
 
-$VERSION="0.20";
+$VERSION="0.21";
 
 sub new {
 	my $proto = shift;
@@ -56,7 +56,7 @@ sub element_decl {
 	}
 	$decl->{type} = "element";
 	$decl->{used_by} = {};
-	$decl->{uses} = [];
+	$decl->{uses} = {};
 	my $name = $decl->{Name};
 	$self->{doc}->{hash_element}->{$name} = $decl;
 	push @{$self->{doc}->{list_decl}}, $decl;
@@ -221,7 +221,7 @@ sub _cross_ref {
 				s/^(#PCDATA)//
 						and last;
 				s/^([A-Za-z_:][0-9A-Za-z\.\-_:]*)//
-						and push(@{$self->{hash_element}->{$name}->{uses}}, $1),
+						and $self->{hash_element}->{$name}->{uses}->{$1} = 1,
 						and $self->{hash_element}->{$1}->{used_by}->{$name} = 1,
 						    last;
 				s/^([\S]+)//
@@ -239,7 +239,7 @@ sub _cross_ref {
 				next if ($elt_name eq $self->{root_name});
 				unless (scalar keys %{$elt_decl->{used_by}}) {
 					delete $self->{hash_element}->{$elt_name};
-					foreach my $child (@{$elt_decl->{uses}}) {
+					foreach my $child (keys %{$elt_decl->{uses}}) {
 						my $decl = $self->{hash_element}->{$child};
 						delete $decl->{used_by}->{$elt_name};
 						$one_more_time = 1;
@@ -344,22 +344,24 @@ sub _extract_doc {
 	my @tags = ();
 	my @lines = split /\n/, $comment->{Data};
 	foreach (@lines) {
-		if      (/^\s*@\s*([\s0-9A-Z_a-z]+):\s*(.*)/) {
-			my $tag = $1;
-			my $value = $2;
+		if      (/^\s*@(@?)\s*([\s0-9A-Z_a-z]+):\s*(.*)/) {
+			my $href = $1;
+			my $tag = $2;
+			my $value = $3;
 			$tag =~ s/\s*$//;
-			if ($tag =~ /INCLUDE/) {
+			if ($tag eq "INCLUDE") {
 				$doc .= $self->_include_doc($value);
 			} else {
-				push @tags, [$tag, $value];
+				push @tags, [$href, $tag, $value];
 			}
-		} elsif (/^\s*@\s*([A-Z_a-z][0-9A-Z_a-z]*)\s+(.*)/) {
-			my $tag = $1;
-			my $value = $2;
-			if ($tag =~ /INCLUDE/) {
+		} elsif (/^\s*@(@?)\s*([A-Z_a-z][0-9A-Z_a-z]*)\s+(.*)/) {
+			my $href = $1;
+			my $tag = $2;
+			my $value = $3;
+			if ($tag eq "INCLUDE") {
 				$doc .= $self->_include_doc($value);
 			} else {
-				push @tags, [$tag, $value];
+				push @tags, [$href, $tag, $value];
 			}
 		} else {
 			$doc .= $_;
@@ -378,7 +380,7 @@ sub _mk_text_anchor {
 
 sub _process_text {
 	my $self = shift;
-	my($text, $current) = @_;
+	my($text, $current, $href) = @_;
 
 	# keep track of leading and trailing white-space
 	my $lead  = ($text =~ s/\A(\s+)//s ? $1 : "");
@@ -393,7 +395,8 @@ sub _process_text {
 		next if ($word =~ /^\s*$/);
 		next if ($word eq $current);
 		if ($word =~ /^[A-Za-z_:][0-9A-Za-z\.\-_:]*$/) {
-			next if ($self->{flag_href});
+#			next if ($self->{flag_href} and !defined($href));
+			next if ($self->{flag_href} and !$href);
 			# looks like a DTD name
 			if (exists $self->{hash_notation}->{$word}) {
 				$word = $self->_mk_text_anchor("not", $word);
@@ -501,10 +504,12 @@ sub _mk_tree {
 
 	return if ($self->{hash_element}->{$name}->{done});
 	$self->{hash_element}->{$name}->{done} = 1;
-	return unless (scalar @{$self->{hash_element}->{$name}->{uses}});
+	die __PACKAGE__,"_mk_tree: INTERNAL ERROR ($name).\n"
+			unless (defined $self->{hash_element}->{$name}->{uses});
+	return unless (scalar keys %{$self->{hash_element}->{$name}->{uses}});
 
 	print $FH "<ul>\n";
-	foreach (@{$self->{hash_element}->{$name}->{uses}}) {
+	foreach (keys %{$self->{hash_element}->{$name}->{uses}}) {
 		next if ($_ eq $name);
 		next if (exists $done{$_});
 		$done{$_} = 1;
@@ -522,7 +527,11 @@ sub generateTree {
 	print $FH "<h2>Element tree.</h2>\n";
 	print $FH "<ul>\n";
 	print $FH "  <li>",$self->_mk_index_anchor("elt",$self->{root_name}),"\n";
-	$self->_mk_tree($FH, $self->{root_name});
+	if (exists $self->{hash_element}->{$self->{root_name}}) {
+		$self->_mk_tree($FH, $self->{root_name});
+	} else {
+		warn "$self->{root_name} declared in DOCTYPE is an unknown element.\n";
+	}
 	print $FH "  </li>\n";
 	print $FH "</ul>\n";
 }
@@ -572,10 +581,11 @@ sub generateComment {
 					}
 					print $FH "    </span>\n";
 					foreach my $tag (@all_attr_tags) {
-						my $entry = ${$tag}[0];
-						my $data = ${$tag}[1];
+						my $href  = ${$tag}[0];
+						my $entry = ${$tag}[1];
+						my $data  = ${$tag}[2];
 						next if ($entry eq "BRIEF");
-						$data = $self->_process_text($data, $name);
+						$data = $self->_process_text($data, $name, $href);
 						print $FH "<p>",$entry," : <span class='comment'>",$data,"</span></p>\n";
 					}
 					print $FH "    </li>\n";
@@ -585,10 +595,11 @@ sub generateComment {
 		}
 	}
 	foreach my $tag (@all_tags) {
-		my $entry = ${$tag}[0];
-		my $data = ${$tag}[1];
+		my $href  = ${$tag}[0];
+		my $entry = ${$tag}[1];
+		my $data  = ${$tag}[2];
 		next if ($entry eq "BRIEF");
-		$data = $self->_process_text($data, $name);
+		$data = $self->_process_text($data, $name, $href);
 		print $FH "  <h4>",$entry,"</h4>\n";
 		print $FH "  <p><span class='comment'>",$data,"</span></p>\n";
 	}
@@ -661,12 +672,10 @@ sub generateMain {
 			}
 			print $FH " &gt;</p>\n";
 		} elsif ($type eq "internal_entity") {
-			my $value = $decl->{Value};
+			my $value = ord $decl->{Value};
 			print $FH "  <li>\n";
 			print $FH "    <h3><a id='ent_",$name,"' name='ent_",$name,"'/>",$name,"</h3>\n";
-			print $FH "<p>&lt;<span class='keyword1'>!ENTITY</span> ",$name," ";
-				$value =~ s/&/&amp;/g;
-				print $FH "'",$value,"'";
+			print $FH "<p>&lt;<span class='keyword1'>!ENTITY</span> ",$name," '&amp;#",$value,";'";
 			print $FH " &gt;</p>\n"
 		} elsif ($type eq "external_entity") {
 			my $systemId = $decl->{SystemId};
@@ -1119,10 +1128,11 @@ sub generateComment {
 						push @all_attr_tags, @{$r_tags};
 					}
 					foreach my $tag (@all_attr_tags) {
-						my $entry = ${$tag}[0];
-						my $data = ${$tag}[1];
+						my $href  = ${$tag}[0];
+						my $entry = ${$tag}[1];
+						my $data  = ${$tag}[2];
 						next if ($entry eq "BRIEF");
-						$data = $self->_process_text($data, $name);
+						$data = $self->_process_text($data, $name, $href);
 						print $FH "      <h4>",$entry,"</h4>\n";
 						print $FH "      <p>",$data,"</p>\n";
 					}
@@ -1133,10 +1143,11 @@ sub generateComment {
 		}
 	}
 	foreach my $tag (@all_tags) {
-		my $entry = ${$tag}[0];
-		my $data = ${$tag}[1];
+		my $href  = ${$tag}[0];
+		my $entry = ${$tag}[1];
+		my $data  = ${$tag}[2];
 		next if ($entry eq "BRIEF");
-		$data = $self->_process_text($data, $name);
+		$data = $self->_process_text($data, $name, $href);
 		print $FH "  <h3>",$entry,"</h3>\n";
 		print $FH "  <p>",$data,"</p>\n";
 	}
@@ -1167,8 +1178,8 @@ sub generatePage {
 		foreach my $comment (@{$decl->{comments}}) {
 			my ($doc, $r_tags) = $self->_extract_doc($comment);
 			foreach my $tag (@{$r_tags}) {
-				my $entry = ${$tag}[0];
-				my $data = ${$tag}[1];
+				my $entry = ${$tag}[1];
+				my $data  = ${$tag}[2];
 				if ($entry eq "BRIEF") {
 					print $FH " -- ",$data;
 					last;
@@ -1200,10 +1211,10 @@ sub generatePage {
 		print $FH "</tr>\n";
 		print $FH "</table>\n";
 	} elsif ($type eq "internal_entity") {
-		my $value = $decl->{Value};
+		my $value = ord $decl->{Value};
 		print $FH "<table class='synopsys' border='1' cellspacing='0' cellpadding='4'>\n";
 		print $FH "<tr><td class='title'>Name</td><td class='title'>Value</td></tr>\n";
-		print $FH "<tr><td>",$name,"</td><td>",$value,"</td></tr>\n";
+		print $FH "<tr><td>",$name,"</td><td>&#",$value,";</td></tr>\n";
 		print $FH "</table>\n";
 	} elsif ($type eq "external_entity") {
 		my $systemId = $decl->{SystemId};
@@ -1247,6 +1258,7 @@ sub generatePage {
 					$value =~ s/['"]$//;
 					$value_default .= " " . $value;
 				}
+				$value_default = "&nbsp;" unless ($value_default);
 				print $FH "<tr><td>",$attr_name,"</td><td>",$type,"</td><td>",$value_default,"</td></tr>\n";
 			}
 		} else {
@@ -1292,11 +1304,11 @@ sub generatePage {
 			print $FH ".";
 			print $FH "  </p>\n";
 		}
-		if (scalar @{$decl->{uses}} != 0) {
+		if (scalar keys %{$decl->{uses}} != 0) {
 			print $FH "<h3>Children</h3>\n";
 			print $FH "  <p>The following elements occur in ",$name,": ";
 			my $first = 1;
-			foreach (sort @{$decl->{uses}}) {
+			foreach (sort keys %{$decl->{uses}}) {
 				print $FH ", " unless ($first);
 				print $FH $self->_mk_model_anchor($_);
 				$first = 0;
