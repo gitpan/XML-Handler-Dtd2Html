@@ -25,7 +25,7 @@ use strict;
 
 use vars qw($VERSION);
 
-$VERSION="0.22";
+$VERSION="0.23";
 
 sub new {
 	my $proto = shift;
@@ -1191,11 +1191,11 @@ sub generatePage {
 		}
 	}
 	print $FH "</p>\n";
-	print $FH "<h2>Synopsys</h2>\n";
+	print $FH "<h2>Synopsis</h2>\n";
 	if      ($type eq "notation") {
 		my $publicId = $decl->{PublicId};
 		my $systemId = $decl->{SystemId};
-		print $FH "<table class='synopsys' border='1' cellspacing='0' cellpadding='4'>\n";
+		print $FH "<table class='synopsis' border='1' cellspacing='0' cellpadding='4'>\n";
 		print $FH "<tr><td class='title'>Name</td>";
 		if (defined $publicId) {
 			print $FH "<td class='title'>Public</td>";
@@ -1215,14 +1215,14 @@ sub generatePage {
 		print $FH "</table>\n";
 	} elsif ($type eq "internal_entity") {
 		my $value = ord $decl->{Value};
-		print $FH "<table class='synopsys' border='1' cellspacing='0' cellpadding='4'>\n";
+		print $FH "<table class='synopsis' border='1' cellspacing='0' cellpadding='4'>\n";
 		print $FH "<tr><td class='title'>Name</td><td class='title'>Value</td></tr>\n";
 		print $FH "<tr><td>",$name,"</td><td>&#",$value,";</td></tr>\n";
 		print $FH "</table>\n";
 	} elsif ($type eq "external_entity") {
 		my $systemId = $decl->{SystemId};
 		my $publicId = $decl->{PublicId};
-		print $FH "<table class='synopsys' border='1' cellspacing='0' cellpadding='4'>\n";
+		print $FH "<table class='synopsis' border='1' cellspacing='0' cellpadding='4'>\n";
 		print $FH "<tr><td class='title'>Name</td>";
 		if (defined $publicId) {
 			print $FH "<td class='title'>Public</td>";
@@ -1245,7 +1245,7 @@ sub generatePage {
 			$type_model = "Content Model";
 		}
 		my $f_model = $self->_format_content_model($model);
-		print $FH "<table class='synopsys' border='1' cellspacing='0' cellpadding='4'>\n";
+		print $FH "<table class='synopsis' border='1' cellspacing='0' cellpadding='4'>\n";
 		print $FH "<tr><td class='title' colspan='3'>",$type_model,"</td></tr>\n";
 		print $FH "<tr><td colspan='3'>",$name," ::= <br />",$f_model,"</td></tr>\n";
 		print $FH "<tr><td class='title' colspan='3'>Attributes</td></tr>\n";
@@ -1271,7 +1271,7 @@ sub generatePage {
 	} elsif ($type eq "doctype") {
 		my $publicId = $decl->{PublicId};
 		my $systemId = $decl->{SystemId};
-		print $FH "<table class='synopsys' border='1' cellspacing='0' cellpadding='4'>\n";
+		print $FH "<table class='synopsis' border='1' cellspacing='0' cellpadding='4'>\n";
 		print $FH "<tr><td class='title'>Name</td>";
 		if (defined $publicId) {
 			print $FH "<td class='title'>Public</td>";
@@ -1392,7 +1392,7 @@ sub generateHTML {
 
 	my $style = "      a.index {font-weight: bold}\n" .
 	            "      hr {text-align: center}\n" .
-	            "      table.synopsys {background-color: #DCDCDC}\n" .	# gainsboro
+	            "      table.synopsis {background-color: #DCDCDC}\n" .	# gainsboro
 	            "      td.title {font-style: italic}\n";
 	my $links;
 

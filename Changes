@@ -1,5 +1,8 @@
 Revision history for Perl extension XML::Handler::Dtd2Html.
 
+0.23  Tue Nov 26 08:30:00 2002
+	- spelling mistake 'Sypnopsis' (thank to Richard)
+
 0.22  Wed Oct 16 12:30:00 2002
 	- fix in patch Expat for XML-SAX-Base v1.04
 
