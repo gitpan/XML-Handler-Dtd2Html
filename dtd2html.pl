@@ -9,10 +9,10 @@ use XML::SAX::Writer;
 use XML::Handler::Dtd2Html;
 
 my %opts;
-getopts('bCdfHMs:t:o:x:Z', \%opts);
+getopts('bCdfHMl:p:s:t:o:x:Z', \%opts);
 
 die "incoherent version between dtd2html.pl and Dtd2Hmtl.pm\n"
-		unless ($XML::Handler::Dtd2Html::VERSION eq "0.25");
+		unless ($XML::Handler::Dtd2Html::VERSION eq "0.30");
 
 my $file = $ARGV[0];
 die "No input file\n"
@@ -55,7 +55,18 @@ if (exists $opts{d}) {
 		bless($doc, "XML::Handler::Dtd2Html::DocumentFrame");
 	}
 
-	$doc->generateHTML($outfile, $opts{t}, $opts{s}, \@examples, !exists($opts{C}), exists($opts{H}), exists($opts{M}), exists($opts{Z}));
+	$doc->GenerateHTML(
+			outfile			=> $outfile,
+			title			=> $opts{t},
+			css				=> $opts{s},
+			examples		=> \@examples,
+			flag_comment	=> !exists($opts{C}),
+			flag_href		=> exists($opts{H}),
+			flag_multi		=> exists($opts{M}),
+			flag_zombi		=> exists($opts{Z}),
+			language		=> $opts{l},
+			path_tmpl		=> $opts{p}
+	);
 }
 
 package DtdWriter;
@@ -96,7 +107,7 @@ dtd2html - Generate a HTML documentation from a DTD
 
 =head1 SYNOPSYS
 
-dtd2html [B<-b> | B<-f> | B<-d>] [B<-C> | B<-M>] [B<-HZ>] [B<-o> I<filename>] [B<-s> I<style>] [B<-t> I<title>] [B<-x> 'I<example1.xml> I<example2.xml> ...'] I<file.xml>
+dtd2html [B<-b> | B<-f> | B<-d>] [B<-C> | B<-M>] [B<-HZ>] [B<-o> I<filename>] [B<-s> I<style>] [B<-t> I<title>] [B<-x> 'I<example1.xml> I<example2.xml> ...'] [B<-l> I<language> | B<-p> I<path>] I<file.xml>
 
 =head1 OPTIONS
 
@@ -122,6 +133,10 @@ Enable the frame mode generation.
 
 Disable generation of href's in comments.
 
+=item -l
+
+Specify the language of templates ('en' is the default).
+
 =item -M
 
 Suppress multi comments, preserve the last.
@@ -129,6 +144,10 @@ Suppress multi comments, preserve the last.
 =item -o
 
 Specify the output.
+
+=item -p
+
+Specify the path of templates.
 
 =item -s
 
@@ -166,7 +185,7 @@ All comments before a declaration are captured.
 
 All entity references inside attribute values are expanded.
 
-This tool needs XML::SAX::Base, XML::SAX::Exception, XML::SAX::Expat and XML::Parser modules.
+This tool needs XML::SAX::Base, XML::SAX::Exception, XML::SAX::Expat, XML::Parser and HTML::Template modules.
 
 =head2 Comments
 
@@ -184,7 +203,7 @@ heading tags like E<lt>h1E<gt> or E<lt>hrE<gt>. B<dtd2html> creates an entire
 structured document and these structural tags interfere with formatting of
 the generated document.
 
-So you must use entities &lt; &gt; &amp; within a comment.
+So, you must use entities &lt; &gt; &amp; within a comment.
 
 =head2 dtd2html Tags
 
@@ -205,6 +224,13 @@ The special tag @INCLUDE allows inclusion of the content of an external file.
    @INCLUDE : description.txt
    @@See Also : REC-xml
  -->
+
+=head2 HTML Templates
+
+Since version 0.30, HTML design and Perl programming are decoupling.
+And a language switch option is providing.
+
+So, translation of the templates are welcome.
 
 =head1 SEE ALSO
 

@@ -1,5 +1,12 @@
 Revision history for Perl extension XML::Handler::Dtd2Html.
 
+0.30  Tue Feb 11 12:30:00 2003
+	- refactoring with HTML::Template
+	- add -l option : select language of templates
+	- add -p option : select path of templates
+	- add graphic icons in book page (mk_icon.pl)
+	- rename generateHTML to GenerateHTML, and params are in a hash
+
 0.25  Mon Jan 13 08:30:00 2003
 	- move attribute target from <a> to <base> (frameset mode)
 

@@ -1,0 +1,66 @@
+<!-- TMPL_INCLUDE NAME='_header.tmpl' -->
+<h1>El&eacute;ment <!-- TMPL_VAR NAME="name" --></h1>
+<h2>Nom</h2>
+<p>
+<!-- TMPL_VAR NAME="name" -->
+<!-- TMPL_IF NAME="brief" -->
+ -- <!-- TMPL_VAR NAME="brief" -->
+<!-- /TMPL_IF -->
+</p>
+<h2>Synopsis</h2>
+<table class='synopsis' border='1' cellspacing='0' cellpadding='4'>
+  <tr>
+    <td class='title' colspan='3'>
+    <!-- TMPL_IF NAME="is_mixed" -->
+        Mod&egrave;le Mixte
+    <!-- TMPL_ELSE -->
+      <!-- TMPL_IF NAME="is_element" -->
+        Mod&egrave;le El&eacute;ment
+      <!-- TMPL_ELSE -->
+        Mod&egrave;le
+      <!-- /TMPL_IF -->
+    <!-- /TMPL_IF -->
+    </td>
+  </tr>
+  <tr>
+    <td colspan='3'><!-- TMPL_VAR NAME="name" --> ::= <br /><!-- TMPL_VAR NAME="f_model" --></td>
+  </tr>
+  <tr>
+    <td class='title' colspan='3'>Attributs</td>
+  </tr>
+<!-- TMPL_IF NAME="attrs" -->
+  <tr>
+    <td class='title'>Nom</td>
+    <td class='title'>Type</td>
+    <td class='title'>D&eacute;faut</td>
+  </tr>
+  <!-- TMPL_LOOP NAME="attrs" -->
+  <tr>
+    <td><!-- TMPL_VAR NAME="attr_name" --></td>
+    <td><!-- TMPL_VAR NAME="type" --></td>
+    <td><!-- TMPL_VAR NAME="value_default" --></td>
+  </tr>
+  <!-- /TMPL_LOOP -->
+<!-- TMPL_ELSE -->
+  <tr>
+    <td colspan='3'>Aucun</td>
+  </tr>
+<!-- /TMPL_IF -->
+</table>
+<!-- TMPL_INCLUDE NAME='_desc.tmpl' -->
+<!-- TMPL_IF NAME="parents" -->
+<h3>Parents</h3>
+<p>Les &eacute;l&eacute;ments suivant peuvent contenir <!-- TMPL_VAR NAME="name" -->:
+  <!-- TMPL_LOOP NAME="parents" --><!-- TMPL_UNLESS NAME="__FIRST__" -->, <!-- /TMPL_UNLESS><TMPL_VAR NAME="a" --><!-- /TMPL_LOOP -->
+.
+</p>
+<!-- /TMPL_IF -->
+<!-- TMPL_IF NAME="childs" -->
+<h3>Fils</h3>
+<p>Les &eacute;l&eacute;ments suivant peuvent &ecirc;tre contenus dans <!-- TMPL_VAR NAME="name" -->:
+  <!-- TMPL_LOOP NAME="childs" --><!-- TMPL_UNLESS NAME="__FIRST__" -->, <!-- /TMPL_UNLESS><TMPL_VAR NAME="a" --><!-- /TMPL_LOOP -->
+.
+</p>
+<!-- /TMPL_IF -->
+<!-- TMPL_INCLUDE NAME='_footer.tmpl' -->
+
