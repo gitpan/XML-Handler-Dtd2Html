@@ -1,5 +1,7 @@
 package XML::Handler::Dtd2Html::Document;
 
+use Parse::RecDescent;
+
 sub new {
 	my $proto = shift;
 	my $class = ref($proto) || $proto;
@@ -11,9 +13,29 @@ sub new {
 			hash_notation           => {},
 			hash_entity             => {},
 			hash_element            => {},
-			hash_attr               => {}
+			hash_attr               => {},
+			hlink                   => 1,
+			preformatted            => "pre"
 	};
 	bless($self, $class);
+	$self->{cm_parser} = Parse::RecDescent->new(<<'EndGrammar');
+		<autotree>
+
+		contentspec: 'EMPTY' | 'ANY' | Mixed | children
+
+		children: ( choice | seq ) ( '?' | '*' | '+' )(?)
+
+		cp: ( Name | choice | seq ) ( '?' | '*' | '+' )(?)
+
+		choice: '(' cp ( '|' cp )(s)  ')'
+
+		seq: '(' cp ( ',' cp )(s?) ')'
+
+		Mixed: '(' '#PCDATA' ( '|' Name )(s?) ')*' | '(' '#PCDATA' ')'
+
+		Name: /[\w_:][\w\d\.\-_:]*/
+
+EndGrammar
 	return $self;
 }
 
@@ -25,7 +47,7 @@ use strict;
 
 use vars qw($VERSION);
 
-$VERSION="0.33";
+$VERSION="0.34";
 
 sub new {
 	my $proto = shift;
@@ -164,6 +186,187 @@ sub comment {
 
 ###############################################################################
 
+package XML::Handler::Dtd2Html::ContentModelVisitor;
+
+sub new {
+	my $proto = shift;
+	my $class = ref($proto) || $proto;
+	my ($handler) = @_;
+	my $self = {
+			handler	=> $handler,
+			str		=> "",
+			raw		=> "",
+			tab		=> "",
+			max		=> 69,
+			need	=> 0,
+	};
+	bless($self, $class);
+	return $self;
+}
+
+sub _inc_tab {
+	my $self = shift;
+	$self->{tab} .= "  ";
+}
+
+sub _dec_tab {
+	my $self = shift;
+	$self->{tab} =~ s/  $//;
+}
+
+sub _add {
+	my $self = shift;
+	my ($raw, $str) = @_;
+	$str = $raw unless (defined $str);
+	$self->{raw} .= $raw;
+	$self->{str} .= $str;
+}
+
+sub _break {
+	my $self = shift;
+	$self->{need} = 0;
+	if ($self->{raw} !~ /^\s*$/) {
+		$self->{raw} = "";
+		$self->{str} .= "\n" . $self->{tab};
+	}
+}
+
+sub _check {
+	my $self = shift;
+	$self->_break()
+			if (length($self->{raw}) > $self->{max});
+}
+
+sub _visit {
+	my $self = shift;
+	my $node = shift;
+
+	my $func = "visit_" . ref $node;
+	if($self->can($func)) {
+		$self->$func($node, @_);
+	} else {
+		warn "Please implement a function '$func' in '",ref $self,"'.\n";
+	}
+}
+
+#		contentspec: 'EMPTY' | 'ANY' | Mixed | children
+sub visit_contentspec {
+	my $self = shift;
+	my ($node) = @_;
+
+	if      (exists $node->{__VALUE__}) {
+		$self->{str} .= $self->{handler}->_mk_value($node->{__VALUE__});
+	} elsif (exists $node->{Mixed}) {
+		$self->_visit($node->{Mixed});
+	} elsif (exists $node->{children}) {
+		$self->_visit($node->{children});
+	}
+}
+
+#		children: ( choice | seq ) ( '?' | '*' | '+' )(?)
+sub visit_children {
+	my $self = shift;
+	my ($node) = @_;
+
+	my $altern1 = $node->{_alternation_1_of_production_1_of_rule_children};
+	if      (exists $altern1->{choice}) {
+		$self->_visit($altern1->{choice});
+	} elsif (exists $altern1->{seq}) {
+		$self->_visit($altern1->{seq});
+	}
+	my $altern2 = shift @{$node->{'_alternation_2_of_production_1_of_rule_children(?)'}};
+	if (defined $altern2) {
+		$self->_add($altern2->{__VALUE__});				# '?' or '*' or '+'
+	}
+}
+
+#		cp: ( Name | choice | seq ) ( '?' | '*' | '+' )(?)
+sub visit_cp  {
+	my $self = shift;
+	my ($node, $first) = @_;
+
+	my $altern1 = $node->{_alternation_1_of_production_1_of_rule_cp};
+	if      (exists $altern1->{Name}) {
+		$self->_break() if ($self->{need});
+		$self->_visit($altern1->{Name});
+	} elsif (exists $altern1->{choice}) {
+		$self->_break() unless ($first);
+		$self->_visit($altern1->{choice});
+		$self->{need} = 1;
+	} elsif (exists $altern1->{seq}) {
+		$self->_break() unless ($first);
+		$self->_visit($altern1->{seq});
+		$self->{need} = 1;
+	}
+	my $altern2 = shift @{$node->{'_alternation_2_of_production_1_of_rule_cp(?)'}};
+	if (defined $altern2) {
+		$self->_add($altern2->{__VALUE__});				# '?' or '*' or '+'
+	}
+}
+
+#		choice: '(' cp ( '|' cp )(s)  ')'
+sub visit_choice {
+	my $self = shift;
+	my ($node) = @_;
+
+	$self->_add($node->{__STRING1__} . " ");				# '('
+	$self->_inc_tab();
+	$self->_visit($node->{cp}, 1);
+	foreach (@{$node->{'_alternation_1_of_production_1_of_rule_choice(s)'}}) {
+		$self->_add(" " . $_->{__STRING1__} . " ");			# '|'
+		$self->_check();
+		$self->_visit($_->{cp}, 0);
+	}
+	$self->_dec_tab();
+	$self->_add(" " . $node->{__STRING2__});				# ')'
+}
+
+#		seq: '(' cp ( ',' cp )(s?) ')'
+sub visit_seq {
+	my $self = shift;
+	my ($node) = @_;
+
+	$self->_add($node->{__STRING1__} . " ");				# '('
+	$self->_inc_tab();
+	$self->_visit($node->{cp}, 1);
+	foreach (@{$node->{'_alternation_1_of_production_1_of_rule_seq(s?)'}}) {
+		$self->_add(" " . $_->{__STRING1__} . " ");			# ','
+		$self->_check();
+		$self->_visit($_->{cp}, 0);
+	}
+	$self->_dec_tab();
+	$self->_add(" " . $node->{__STRING2__});				# ')'
+}
+
+#		Mixed: '(' '#PCDATA' ( '|' Name )(s?) ')*' | '(' '#PCDATA' ')'
+sub visit_Mixed {
+	my $self = shift;
+	my ($node) = @_;
+
+	$self->_add($node->{__STRING1__} . " ");				# '('
+	my $value = $self->{handler}->_mk_value($node->{__STRING2__});
+	$self->_inc_tab();
+	$self->_add($node->{__STRING2__}, $value);				# '#PCDATA'
+	foreach (@{$node->{'_alternation_1_of_production_1_of_rule_Mixed(s?)'}}) {
+		$self->_add(" " . $_->{__STRING1__} . " ");			# '|'
+		$self->_check();
+		$self->_visit($_->{Name});
+	}
+	$self->_dec_tab();
+	$self->_add(" " . $node->{__STRING3__});				# ')*' or ')'
+}
+
+#		Name: /[\w_:][\w\d\.\-_:]*/
+sub visit_Name {
+	my $self = shift;
+	my ($node) = @_;
+
+	my $anchor = $self->{handler}->_mk_text_anchor("elt", $node->{__VALUE__});
+	$self->_add($node->{__VALUE__}, $anchor);
+}
+
+###############################################################################
+
 package XML::Handler::Dtd2Html::Document;
 
 use HTML::Template;
@@ -282,39 +485,9 @@ sub _cross_ref {
 sub _format_content_model {
 	my $self = shift;
 	my ($model) = @_;
-	my $str = "";
-	while ($model) {
-		for ($model) {
-			s/^([ \n\r\t\f\013]+)//							# whitespaces
-					and $str .= $1,
-					    last;
-
-			s/^([\?\*\+\)])//
-					and $str .= $1,
-					    last;
-			s/^([\(,])//
-					and $str .= $1 . " ",
-					    last;
-			s/^(\|)//
-					and $str .= " " . $1 . " ",
-					    last;
-			s/^(EMPTY)//
-					and $str .= "<span class='keyword1'>" . $1 . "</span> ",
-					    last;
-			s/^(ANY)//
-					and $str .= "<span class='keyword1'>" . $1 . "</span> ",
-					    last;
-			s/^(#PCDATA)//
-					and $str .= "<span class='keyword1'>" . $1 . "</span> ",
-					    last;
-			s/^([A-Za-z_:][0-9A-Za-z\.\-_:]*)//
-					and $str .= $self->_mk_text_anchor("elt", $1) . " ",
-					    last;
-			s/^([\S]+)//
-					and warn __PACKAGE__,":_format_content_model INTERNAL_ERROR $1\n",
-					    last;
-		}
-	}
+	my $visitor = new XML::Handler::Dtd2Html::ContentModelVisitor($self);
+	$visitor->_visit($self->{cm_parser}->contentspec($model));
+	my $str = $visitor->{str};
 	return $str;
 }
 
@@ -399,15 +572,24 @@ sub _process_text {
 		} elsif ($word =~ /^\w+:\/\/\w/) {
 			# looks like a URL
 			# Don't relativize it: leave it as the author intended
-			$word = "<a href='" . $word . "'>" . $word . "</a>";
+			$word = "<a href='" . $word . "'>" . $word . "</a>"
+					if ($self->{hlink});
 		} elsif ($word =~ /^[\w.-]+\@[\w.-]+/) {
 			# looks like an e-mail address
-			$word = "<a href='mailto:" . $word . "'>" . $word . "</a>";
+			$word = "<a href='mailto:" . $word . "'>" . $word . "</a>"
+					if ($self->{hlink});
 		}
 	}
 
 	# put everything back together
 	return $lead . join('', @words) . $trail;
+}
+
+sub _mk_value {
+	my $self = shift;
+	my($value) = @_;
+
+	return "<span class='keyword1'>" . $value . "</span> ";
 }
 
 sub _mk_index_anchor {
@@ -444,10 +626,18 @@ sub generateAlphaElement {
 	my @a_link = ();
 	foreach (@elements) {
 		my $a = $self->_mk_index_anchor("elt", $_);
-		$a .= " <em>(root)</em>" if ($_ eq $self->{root_name});
-		my $brief = $self->_get_brief($self->{hash_element}->{$_}) if ($flg_brief);
-		$a .= " - " . $brief if ($brief);
-		push @a_link, { a => $a };
+		if ($flg_brief) {
+			my $brief = $self->_get_brief($self->{hash_element}->{$_});
+			push @a_link, {
+					a			=> $a,
+					brief		=> $brief,
+					root		=> ($_ eq $self->{root_name}),
+			};
+		} else {
+			push @a_link, {
+					a			=> $a,
+			};
+		}
 	}
 	$self->{template}->param(
 			$nb			=> scalar @elements,
@@ -466,9 +656,18 @@ sub generateAlphaEntity {
 	my @a_link = ();
 	foreach (@entities) {
 		my $a = $self->_mk_index_anchor("ent", $_);
-		my $brief = $self->_get_brief($self->{hash_entity}->{$_}) if ($flg_brief);
-		$a .= " - " . $brief if ($brief);
-		push @a_link, { a => $a };
+		if ($flg_brief) {
+			my $brief = $self->_get_brief($self->{hash_element}->{$_});
+			push @a_link, {
+					a			=> $a,
+					brief		=> $brief,
+					root		=> undef,
+			};
+		} else {
+			push @a_link, {
+					a			=> $a,
+			};
+		}
 	}
 	$self->{template}->param(
 			$nb			=> scalar @entities,
@@ -487,9 +686,18 @@ sub generateAlphaNotation {
 	my @a_link = ();
 	foreach (@notations) {
 		my $a = $self->_mk_index_anchor("not", $_);
-		my $brief = $self->_get_brief($self->{hash_notation}->{$_}) if ($flg_brief);
-		$a .= " - " . $brief if ($brief);
-		push @a_link, { a => $a };
+		if ($flg_brief) {
+			my $brief = $self->_get_brief($self->{hash_element}->{$_});
+			push @a_link, {
+					a			=> $a,
+					brief		=> $brief,
+					root		=> undef,
+			};
+		} else {
+			push @a_link, {
+					a			=> $a,
+			};
+		}
 	}
 	$self->{template}->param(
 			$nb			=> scalar @notations,
@@ -508,7 +716,9 @@ sub generateExampleIndex {
 	my @a_link = ();
 	foreach (@examples) {
 		my $a = $self->_mk_index_anchor("ex", $_);
-		push @a_link, { a => $a };
+		push @a_link, {
+				a			=> $a,
+		};
 	}
 	$self->{template}->param(
 			$nb			=> scalar @examples,
@@ -581,7 +791,7 @@ sub _get_doc {
 						or (uc($entry) eq "TITLE" and $decl->{type} eq "doctype") ) {
 					if ($entry =~ /^SAMPLE($|\s)/i) {
 						$entry =~ s/^SAMPLE\s*//i;
-						$data = "<pre>" . $self->_mk_example($data) . "</pre>";
+						$data = "<$self->{preformatted}>" . $self->_mk_example($data) . "</$self->{preformatted}>";
 						push @tag, {
 								entry	=> $entry,
 								data	=> $data,
@@ -623,7 +833,7 @@ sub _get_doc_attrs {
 								or uc($entry) eq "HIDDEN" ) {
 							if ($entry =~ /^SAMPLE($|\s)/i) {
 								$entry =~ s/^SAMPLE\s*//i;
-								$data = "<pre>" . $self->_mk_example($data) . "</pre>";
+								$data = "<$self->{preformatted}>" . $self->_mk_example($data) . "</$self->{preformatted}>";
 								push @tag, {
 										entry	=> $entry,
 										data	=> $data,
@@ -869,10 +1079,12 @@ sub generateCSS {
 
 	my $outfile = $self->{dirname} . "/" . $self->{css} . ".css";
 
-	open OUT, "> $outfile"
-			or die "can't open $outfile ($!)\n";
-	print OUT $style;
-	close OUT;
+	unless ( -e $outfile) {
+		open OUT, "> $outfile"
+				or die "can't open $outfile ($!)\n";
+		print OUT $style;
+		close OUT;
+	}
 }
 
 sub GenerateHTML {
@@ -1089,6 +1301,9 @@ sub _get_attributes {
 	my @attrs = ();
 	if (exists $self->{hash_attr}->{$name}) {
 		foreach my $attr (@{$self->{hash_attr}->{$name}}) {
+			my @enum = ();
+			my $is_enum;
+			my $is_notation;
 			my $type = $attr->{Type};
 			if (        $type ne "CDATA"
 					and $type ne "ID"
@@ -1099,15 +1314,23 @@ sub _get_attributes {
 					and $type ne "NMTOKEN"
 					and $type ne "NMTOKENS" ) {
 				if ($type =~ /^NOTATION/) {
+					$is_notation = 1;
 					$type =~ s/^NOTATION\s*\(//;
 					$type =~ s/\)$//;
-					$type =~ s/\|/<br \/>/g;
-					$type = "<em>Enumerated notation:</em><br />" . $type;
+					foreach (split /\|/, $type) {
+						push @enum, {
+								val		=> $_,
+						};
+					}
 				} else {
+					$is_enum = 1;
 					$type =~ s/^\(//;
 					$type =~ s/\)$//;
-					$type =~ s/\|/<br \/>/g;
-					$type = "<em>Enumeration:</em><br />" . $type;
+					foreach (split /\|/, $type) {
+						push @enum, {
+								val		=> $_,
+						};
+					}
 				}
 			}
 			my $value_default = $attr->{ValueDefault};
@@ -1118,6 +1341,9 @@ sub _get_attributes {
 			$value_default = "&nbsp;" unless ($value_default);
 			push @attrs, {
 					attr_name	=> $attr->{aName},
+					is_enum		=> $is_enum,
+					is_notation	=> $is_notation,
+					enum		=> \@enum,
 					type		=> $type,
 					value_default	=> $value_default,
 			};
@@ -1125,6 +1351,13 @@ sub _get_attributes {
 	}
 
 	return \@attrs;
+}
+
+sub _mk_value {
+	my $self = shift;
+	my($value) = @_;
+
+	return $value;
 }
 
 sub _mk_index_href {

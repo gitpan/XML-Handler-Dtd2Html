@@ -12,6 +12,7 @@ WriteMakefile(
                         'XML::SAX::Expat'       => 0.37,
                         'XML::SAX::Writer'      => 0.44,
                         'HTML::Template'        => 0,
+                        'Parse::RecDescent'     => 0,
     },
     'PM'            => {
                         'Dtd2Html.pm'       => '$(INST_LIBDIR)/Dtd2Html.pm',

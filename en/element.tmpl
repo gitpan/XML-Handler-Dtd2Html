@@ -8,7 +8,7 @@
 <!-- /TMPL_IF -->
 </p>
 <h2>Synopsis</h2>
-<table class='synopsis' width='100%' border='1' cellspacing='0' cellpadding='4'>
+<table class='synopsis' border='1' cellspacing='0' cellpadding='4'>
   <colgroup><col width='33%'/><col width='34%'/><col width='33%'/></colgroup>
   <tr>
     <td class='title' colspan='3'>
@@ -24,7 +24,8 @@
     </td>
   </tr>
   <tr>
-    <td colspan='3'><!-- TMPL_VAR NAME="name" --> ::= <br /><!-- TMPL_VAR NAME="f_model" --></td>
+    <td colspan='3'><pre><!-- TMPL_VAR NAME="name" --> ::=
+<!-- TMPL_VAR NAME="f_model" --></pre></td>
   </tr>
   <tr>
     <td class='title' colspan='3'>Attributes</td>
@@ -38,7 +39,23 @@
   <!-- TMPL_LOOP NAME="attrs" -->
   <tr valign='top'>
     <td><!-- TMPL_VAR NAME="attr_name" --></td>
-    <td><!-- TMPL_VAR NAME="type" --></td>
+    <td>
+      <!-- TMPL_IF NAME="is_enum" -->
+          <em>Enumeration:</em>
+          <!-- TMPL_LOOP NAME="enum" -->
+            <br /><!-- TMPL_VAR NAME="val" -->
+          <!-- /TMPL_LOOP -->
+      <!-- TMPL_ELSE -->
+        <!-- TMPL_IF NAME="is_notation" -->
+          <em>Enumerated notation:</em>
+          <!-- TMPL_LOOP NAME="enum" -->
+            <br /><!-- TMPL_VAR NAME="val" -->
+          <!-- /TMPL_LOOP -->
+        <!-- TMPL_ELSE -->
+          <!-- TMPL_VAR NAME="type" -->
+        <!-- /TMPL_IF -->
+      <!-- /TMPL_IF -->
+    </td>
     <td><!-- TMPL_VAR NAME="value_default" --></td>
   </tr>
   <!-- /TMPL_LOOP -->
@@ -52,14 +69,14 @@
 <!-- TMPL_IF NAME="parents" -->
 <h3>Parents</h3>
 <p>These elements contain <!-- TMPL_VAR NAME="name" -->:
-  <!-- TMPL_LOOP NAME="parents" --><!-- TMPL_UNLESS NAME="__FIRST__" -->, <!-- /TMPL_UNLESS><TMPL_VAR NAME="a" --><!-- /TMPL_LOOP -->
+  <!-- TMPL_LOOP NAME="parents" --><!-- TMPL_UNLESS NAME="__FIRST__" -->, <!-- /TMPL_UNLESS --><!-- TMPL_VAR NAME="a" --><!-- /TMPL_LOOP -->
 .
 </p>
 <!-- /TMPL_IF -->
 <!-- TMPL_IF NAME="childs" -->
 <h3>Children</h3>
 <p>The following elements occur in <!-- TMPL_VAR NAME="name" -->:
-  <!-- TMPL_LOOP NAME="childs" --><!-- TMPL_UNLESS NAME="__FIRST__" -->, <!-- /TMPL_UNLESS><TMPL_VAR NAME="a" --><!-- /TMPL_LOOP -->
+  <!-- TMPL_LOOP NAME="childs" --><!-- TMPL_UNLESS NAME="__FIRST__" -->, <!-- /TMPL_UNLESS --><!-- TMPL_VAR NAME="a" --><!-- /TMPL_LOOP -->
 .
 </p>
 <!-- /TMPL_IF -->

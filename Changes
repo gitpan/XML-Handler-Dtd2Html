@@ -1,5 +1,9 @@
 Revision history for Perl extension XML::Handler::Dtd2Html.
 
+0.34  Fri Sep  5 12:30:00 2003
+	- new formatting of content model (use Parse::RecDescent)
+	- don't overwrite CSS file if exists
+
 0.33  Mon Aug 25 12:30:00 2003
 	- add special tag : SAMPLE
 	- layout : some improvements

@@ -4,8 +4,8 @@
 
   <head>
     <meta http-equiv='Content-Type' content='text/html; charset=ISO-8859-1' />
-    <meta name='generator' content='dtd2html 0.33 (Perl 5.006001)' />
-    <meta name='date' content='Mon Aug 25 11:59:52 2003' />
+    <meta name='generator' content='dtd2html 0.34 (Perl 5.006001)' />
+    <meta name='date' content='Fri Sep  5 14:48:40 2003' />
     <title>Perl Package Distribution </title>
     
     <style type='text/css'>
@@ -51,7 +51,7 @@
     
     <dt><a class='index' href='#elt_PROCESSOR'>PROCESSOR</a></dt>
     
-    <dt><a class='index' href='#elt_SOFTPKG'>SOFTPKG</a> <em>(root)</em></dt>
+    <dt><a class='index' href='#elt_SOFTPKG'>SOFTPKG</a></dt>
     
     <dt><a class='index' href='#elt_TITLE'>TITLE</a></dt>
     
@@ -141,7 +141,7 @@
       
         <a id='elt_SOFTPKG' name='elt_SOFTPKG'/>
         <h3>SOFTPKG</h3>
-        <p>&lt;<span class='keyword1'>!ELEMENT</span> SOFTPKG ( <a href='#elt_ABSTRACT'>ABSTRACT</a>  | <a href='#elt_AUTHOR'>AUTHOR</a>  | <a href='#elt_IMPLEMENTATION'>IMPLEMENTATION</a>  | <a href='#elt_LICENSE'>LICENSE</a>  | <a href='#elt_TITLE'>TITLE</a> )* &gt;
+        <p>&lt;<span class='keyword1'>!ELEMENT</span> SOFTPKG ( <a href='#elt_ABSTRACT'>ABSTRACT</a> | <a href='#elt_AUTHOR'>AUTHOR</a> | <a href='#elt_IMPLEMENTATION'>IMPLEMENTATION</a> | <a href='#elt_LICENSE'>LICENSE</a> | <a href='#elt_TITLE'>TITLE</a> )* &gt;
         
           <br />
           &lt;<span class='keyword1'>!ATTLIST</span> SOFTPKG NAME
@@ -211,7 +211,7 @@
       
         <a id='elt_TITLE' name='elt_TITLE'/>
         <h3>TITLE</h3>
-        <p>&lt;<span class='keyword1'>!ELEMENT</span> TITLE ( <span class='keyword1'>#PCDATA</span> ) &gt;
+        <p>&lt;<span class='keyword1'>!ELEMENT</span> TITLE ( <span class='keyword1'>#PCDATA</span>  ) &gt;
         
         </p>
       
@@ -232,7 +232,7 @@
       
         <a id='elt_ABSTRACT' name='elt_ABSTRACT'/>
         <h3>ABSTRACT</h3>
-        <p>&lt;<span class='keyword1'>!ELEMENT</span> ABSTRACT ( <span class='keyword1'>#PCDATA</span> ) &gt;
+        <p>&lt;<span class='keyword1'>!ELEMENT</span> ABSTRACT ( <span class='keyword1'>#PCDATA</span>  ) &gt;
         
         </p>
       
@@ -254,7 +254,7 @@
       
         <a id='elt_AUTHOR' name='elt_AUTHOR'/>
         <h3>AUTHOR</h3>
-        <p>&lt;<span class='keyword1'>!ELEMENT</span> AUTHOR ( <span class='keyword1'>#PCDATA</span> ) &gt;
+        <p>&lt;<span class='keyword1'>!ELEMENT</span> AUTHOR ( <span class='keyword1'>#PCDATA</span>  ) &gt;
         
         </p>
       
@@ -322,7 +322,8 @@
       
         <a id='elt_IMPLEMENTATION' name='elt_IMPLEMENTATION'/>
         <h3>IMPLEMENTATION</h3>
-        <p>&lt;<span class='keyword1'>!ELEMENT</span> IMPLEMENTATION ( <a href='#elt_CODEBASE'>CODEBASE</a>  | <a href='#elt_DEPENDENCY'>DEPENDENCY</a>  | <a href='#elt_LANGUAGE'>LANGUAGE</a>  | <a href='#elt_OS'>OS</a>  | <a href='#elt_OSVERSION'>OSVERSION</a>  | <a href='#elt_PERLCORE'>PERLCORE</a>  | <a href='#elt_PROCESSOR'>PROCESSOR</a>  | <a href='#elt_INSTALL'>INSTALL</a>  | <a href='#elt_UNINSTALL'>UNINSTALL</a> )* &gt;
+        <p>&lt;<span class='keyword1'>!ELEMENT</span> IMPLEMENTATION ( <a href='#elt_CODEBASE'>CODEBASE</a> | <a href='#elt_DEPENDENCY'>DEPENDENCY</a> | <a href='#elt_LANGUAGE'>LANGUAGE</a> | <a href='#elt_OS'>OS</a> | <a href='#elt_OSVERSION'>OSVERSION</a> | <a href='#elt_PERLCORE'>PERLCORE</a> | <a href='#elt_PROCESSOR'>PROCESSOR</a> | 
+  <a href='#elt_INSTALL'>INSTALL</a> | <a href='#elt_UNINSTALL'>UNINSTALL</a> )* &gt;
         
         </p>
       
@@ -693,7 +694,7 @@
       
         <a id='elt_INSTALL' name='elt_INSTALL'/>
         <h3>INSTALL</h3>
-        <p>&lt;<span class='keyword1'>!ELEMENT</span> INSTALL ( <span class='keyword1'>#PCDATA</span> ) &gt;
+        <p>&lt;<span class='keyword1'>!ELEMENT</span> INSTALL ( <span class='keyword1'>#PCDATA</span>  ) &gt;
         
           <br />
           &lt;<span class='keyword1'>!ATTLIST</span> INSTALL HREF
@@ -763,7 +764,7 @@
       
         <a id='elt_UNINSTALL' name='elt_UNINSTALL'/>
         <h3>UNINSTALL</h3>
-        <p>&lt;<span class='keyword1'>!ELEMENT</span> UNINSTALL ( <span class='keyword1'>#PCDATA</span> ) &gt;
+        <p>&lt;<span class='keyword1'>!ELEMENT</span> UNINSTALL ( <span class='keyword1'>#PCDATA</span>  ) &gt;
         
           <br />
           &lt;<span class='keyword1'>!ATTLIST</span> UNINSTALL HREF

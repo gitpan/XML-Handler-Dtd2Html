@@ -12,9 +12,11 @@
   <h2>Liste des exemples.</h2>
 <!-- /TMPL_IF -->
 <blockquote><dl>
-<!-- TMPL_IF NAME=nb -->
+<!-- TMPL_IF NAME="nb" -->
   <!-- TMPL_LOOP NAME="a_link" -->
-  <dt><!-- TMPL_VAR NAME="a" --></dt>
+  <dt><!-- TMPL_VAR NAME="a" --><!-- TMPL_IF NAME="root" --> <em>(racine)</em><!-- /TMPL_IF -->
+    <!-- TMPL_IF NAME="brief" --> - <!-- TMPL_VAR NAME="brief" --><!-- /TMPL_IF -->
+  </dt>
   <!-- /TMPL_LOOP -->
 <!-- TMPL_ELSE -->
   <dt>AUCUN</dt>
