@@ -12,7 +12,7 @@ my %opts;
 getopts('bCdfHMs:t:o:x:Z', \%opts);
 
 die "incoherent version between dtd2html.pl and Dtd2Hmtl.pm\n"
-		unless ($XML::Handler::Dtd2Html::VERSION eq "0.24");
+		unless ($XML::Handler::Dtd2Html::VERSION eq "0.25");
 
 my $file = $ARGV[0];
 die "No input file\n"
@@ -220,7 +220,7 @@ Francois PERRAD, francois.perrad@gadz.org
 
 =head1 COPYRIGHT
 
-(c) 2002 Francois PERRAD, France. All rights reserved.
+(c) 2002-2003 Francois PERRAD, France. All rights reserved.
 
 This program is distributed under the Artistic License.
 

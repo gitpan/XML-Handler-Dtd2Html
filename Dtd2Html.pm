@@ -25,7 +25,7 @@ use strict;
 
 use vars qw($VERSION);
 
-$VERSION="0.24";
+$VERSION="0.25";
 
 sub new {
 	my $proto = shift;
@@ -252,10 +252,10 @@ sub _cross_ref {
 
 sub _format_head {
 	my $self = shift;
-	my($FH, $title, $style) = @_;
+	my($FH, $title, $style, $target) = @_;
 	my $now = localtime();
 	print $FH "<?xml version='1.0' encoding='ISO-8859-1'?>\n";
-	print $FH "<!DOCTYPE html PUBLIC '-//W3C//DTD XHTML 1.0 Strict//EN' 'xhtml1-strict.dtd'>\n";
+	print $FH "<!DOCTYPE html PUBLIC '-//W3C//DTD XHTML 1.0 Strict//EN' 'http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd'>\n";
 	print $FH "<html xmlns='http://www.w3.org/1999/xhtml'>\n";
 	print $FH "\n";
 	print $FH "  <head>\n";
@@ -263,6 +263,7 @@ sub _format_head {
 	print $FH "    <meta name='generator' content='dtd2html ",$self->version()," (Perl ",$],")' />\n";
 	print $FH "    <meta name='date' content='",$now,"' />\n";
 	print $FH "    <title>",$title,"</title>\n";
+	print $FH "    <base target='",$target,"' />\n" if (defined $target);
 	if ($self->{css}) {
 		print $FH "    <link href='",$self->{css},".css' rel='stylesheet' type='text/css'/>\n";
 	} else {
@@ -872,7 +873,7 @@ sub _format_head {
 	my($FH) = @_;
 	my $now = localtime();
 	print $FH "<?xml version='1.0' encoding='ISO-8859-1'?>\n";
-	print $FH "<!DOCTYPE html PUBLIC '-//W3C//DTD XHTML 1.0 Frameset//EN' 'xhtml1-frameset.dtd'>\n";
+	print $FH "<!DOCTYPE html PUBLIC '-//W3C//DTD XHTML 1.0 Frameset//EN' 'http://www.w3.org/TR/xhtml1/DTD/xhtml1-frameset.dtd'>\n";
 	print $FH "<html xmlns='http://www.w3.org/1999/xhtml'>\n";
 	print $FH "\n";
 	print $FH "  <head>\n";
@@ -888,7 +889,7 @@ sub _mk_index_anchor {
 	my $self = shift;
 	my($type, $name) = @_;
 
-	return "<a class='index' target='main' href='" . $self->{filebase} . ".main.html#" . $type . "_" . $name ."'>" . $name . "</a>";
+	return "<a class='index' href='" . $self->{filebase} . ".main.html#" . $type . "_" . $name ."'>" . $name . "</a>";
 }
 
 sub generateHTML {
@@ -930,7 +931,7 @@ sub generateHTML {
 
 	open OUT, "> $self->{outfile}.alpha.html"
 			or die "can't open $self->{outfile}.alpha.html ($!)\n";
-	$self->SUPER::_format_head(\*OUT, $self->{title} . " (Index)", $style);
+	$self->SUPER::_format_head(\*OUT, $self->{title} . " (Index)", $style, "main");
 	print OUT "  <body>\n";
 	$self->generateAlphaElement(\*OUT);
 	$self->generateAlphaEntity(\*OUT);
@@ -942,7 +943,7 @@ sub generateHTML {
 
 	open OUT, "> $self->{outfile}.tree.html"
 			or die "can't open $self->{outfile}.tree.html ($!)\n";
-	$self->SUPER::_format_head(\*OUT, $self->{title} . " (Tree)", $style);
+	$self->SUPER::_format_head(\*OUT, $self->{title} . " (Tree)", $style, "main");
 	print OUT "  <body>\n";
 	$self->generateTree(\*OUT);
 	print OUT "  </body>\n";
@@ -979,7 +980,7 @@ sub _format_head {
 	my($FH, $title, $style, $links) = @_;
 	my $now = localtime();
 	print $FH "<?xml version='1.0' encoding='ISO-8859-1'?>\n";
-	print $FH "<!DOCTYPE html PUBLIC '-//W3C//DTD XHTML 1.0 Strict//EN' 'xhtml1-strict.dtd'>\n";
+	print $FH "<!DOCTYPE html PUBLIC '-//W3C//DTD XHTML 1.0 Strict//EN' 'http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd'>\n";
 	print $FH "<html xmlns='http://www.w3.org/1999/xhtml'>\n";
 	print $FH "\n";
 	print $FH "  <head>\n";

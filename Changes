@@ -1,5 +1,8 @@
 Revision history for Perl extension XML::Handler::Dtd2Html.
 
+0.25  Mon Jan 13 08:30:00 2003
+	- move attribute target from <a> to <base> (frameset mode)
+
 0.24  Thu Nov 28 20:30:00 2002
 	- sorry for 0.23
 
