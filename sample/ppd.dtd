@@ -1,3 +1,4 @@
+ <!-- @BRIEF : root element of a description of a software package --> 
  <!-- It's the root element of a description of a software package, in Perl
    Package Distribution (PPD) format which is an XML application. -->
  <!-- HISTORY : v0.1 - Initial release -->
@@ -8,6 +9,7 @@
  <!-- Version number of the package, in comma-delimited format (e.g. ``1,0,0,0'').  -->
  <!ATTLIST SOFTPKG   VERSION CDATA #IMPLIED>
 
+ <!-- @BRIEF : state the title of the Perl Package -->
  <!-- Used to state the title of the Perl Package. Only one instance should be present. -->
  <!ELEMENT TITLE     (#PCDATA)>
 
@@ -26,6 +28,7 @@
   or copyright notice for this package. -->
  <!ATTLIST LICENSE   HREF     CDATA #REQUIRED>
 
+ <!-- @BRIEF : describe a particular implementation of the Perl Package --> 
  <!-- Used to describe a particular implementation of the Perl Package. Multiple
   instances are valid, and should be used to describe different implementations/ports
   for different operating systems or architectures. -->
@@ -55,6 +58,7 @@
  <!ELEMENT LANGUAGE  EMPTY>
  <!ATTLIST LANGUAGE  VALUE CDATA #REQUIRED>
 
+ <!-- @BRIEF : the operating system required for this implementation --> 
  <!-- Used to outline the operating system required for this implementation of
   the Perl Package. Multiple instances are valid. Valid values can be taken
   from the OSD Specification and it's OS element. -->
@@ -63,6 +67,7 @@
   Perl Package. This value should be obtained from Config.pm as 'osname'. -->
  <!ATTLIST OS        VALUE CDATA #REQUIRED>
 
+ <!-- @BRIEF : the required version of the operating system --> 
  <!-- Used to outline the required version of the operating system required for
   this implementation of the Perl Package. Only one instance should be present. -->
  <!ELEMENT OSVERSION EMPTY>
@@ -70,6 +75,7 @@
   implementation of the package, in a comma-delimited format (e.g. ``3,1,0,0''). -->
  <!ATTLIST OSVERSION VALUE CDATA #REQUIRED>
 
+ <!-- @BRIEF : the minimum version of the Perl core distribution --> 
  <!-- Used to specify the minimum version of the Perl core distribution that
   this Perl Package is to be used with. Only one instance should be present. -->
  <!ELEMENT PERLCORE  EMPTY>
@@ -85,6 +91,7 @@
    x86 alpha mips sparc 680x0 -->
  <!ATTLIST PROCESSOR VALUE CDATA #REQUIRED>
 
+ <!-- @BRIEF : provide either a reference to an installation script -->
  <!-- Used to provide either a reference to an installation script or a series
   of commands which can be used to install the Perl Package once it has been
   retrieved. If the EXEC attribute is not specified, the value is assumed to be
@@ -99,6 +106,7 @@
   is used to execute the install script. -->
  <!ATTLIST INSTALL   EXEC  CDATA #IMPLIED>
 
+ <!-- @BRIEF : provide either a reference to an uninstallation script -->
  <!-- Used to provide either a reference to an uninstallation script or a raw
   Perl script which can be used to uninstall the Perl Package at a later point.
   Only one instance should be present. -->

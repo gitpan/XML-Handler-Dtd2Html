@@ -1,12 +1,12 @@
 
 all:
-	dtd2html.pl -t "Perl Package Distribution" -o ppd sample.ppd
+	dtd2html.pl -t "Perl Package Distribution" -o ppd entry.ppd
 
 frame:
 	mkdir frame
-	dtd2html.pl -f -t "Perl Package Distribution" -o frame/ppd sample.ppd
+	dtd2html.pl -f -t "Perl Package Distribution" -o frame/ppd entry.ppd
 
 book:
 	mkdir book
-	dtd2html.pl -b -t "Perl Package Distrubtion" -o book/ppd -s style -x sample.ppd sample.ppd
+	dtd2html.pl -b -t "Perl Package Distrubtion" -o book/ppd -s style -x sample.ppd entry.ppd
 

@@ -1,0 +1,8 @@
+94c94,98
+<     my $expat = XML::Parser->new;
+---
+>     my @xml_parser_options;
+>     push (@xml_parser_options, ParseParamEnt => $opt->{ParseParamEnt})
+>          if (defined $opt->{ParseParamEnt});
+> 
+>     my $expat = XML::Parser->new(@xml_parser_options);

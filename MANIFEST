@@ -5,8 +5,9 @@ Makefile.PL
 MANIFEST
 test.pl
 README
-PerlSAX.patch
+SAX-Expat.0.35.patch
 sample/makefile
+sample/entry.ppd
 sample/sample.ppd
 sample/ppd.dtd
 sample/ppd.html

@@ -4,14 +4,14 @@ use strict;
 
 use Getopt::Std;
 use IO::File;
-use XML::Parser::PerlSAX;
+use XML::SAX::Expat;
 use XML::Handler::Dtd2Html;
 
 my %opts;
-getopts('bCfMs:t:o:x:Z', \%opts);
+getopts('bCfHMs:t:o:x:Z', \%opts);
 
 my $handler = new XML::Handler::Dtd2Html();
-my $parser = new XML::Parser::PerlSAX(Handler => $handler, ParseParamEnt => 1);
+my $parser = new XML::SAX::Expat(Handler => $handler, ParseParamEnt => 1);
 
 my $file = $ARGV[0];
 die "No input file\n"
@@ -43,7 +43,7 @@ if      ($opts{b}) {
 	bless($doc, "XML::Handler::Dtd2Html::DocumentFrame");
 }
 
-$doc->generateHTML($outfile, $opts{t}, $opts{s}, \@examples, !exists($opts{C}), exists($opts{M}), exists($opts{Z}));
+$doc->generateHTML($outfile, $opts{t}, $opts{s}, \@examples, !exists($opts{C}), exists($opts{H}), exists($opts{M}), exists($opts{Z}));
 
 __END__
 
@@ -53,7 +53,7 @@ dtd2html - Generate a HTML documentation from a DTD
 
 =head1 SYNOPSYS
 
-dtd2html [B<-b> | B<-f>] [B<-C> | B<-M>] [B<-Z>] [B<-o> I<filename>] [B<-s> I<style>] [B<-t> I<title>] [B<-x> 'I<example1.xml> I<example2.xml> ...'] I<file.xml>
+dtd2html [B<-b> | B<-f>] [B<-C> | B<-M>] [B<-HZ>] [B<-o> I<filename>] [B<-s> I<style>] [B<-t> I<title>] [B<-x> 'I<example1.xml> I<example2.xml> ...'] I<file.xml>
 
 =head1 OPTIONS
 
@@ -71,6 +71,10 @@ Suppress all comments.
 
 Enable the frame mode generation.
 
+=item -H
+
+Disable generation of href's in comments.
+
 =item -M
 
 Suppress multi comments, preserve the last.
@@ -85,7 +89,7 @@ Generate an external I<style>.css file.
 
 =item -t
 
-Specify the title of the resulting HTML file.
+Specify the title of the HTML files.
 
 =item -x
 
@@ -93,7 +97,7 @@ Include a list of XML files as examples.
 
 =item -Z
 
-Delete zombi element (without parent).
+Delete zombi element (e.g. without parent).
 
 =back
 
@@ -115,9 +119,7 @@ All comments before a declaration are captured.
 
 All entity references inside attribute values are expanded.
 
-This tool needs XML::Parser::PerlSAX (libxml-perl) and XML::Parser modules.
-
-XML::Parser::PerlSAX v0.07 needs to be patched (PerlSAX.patch).
+This tool needs XML::SAX::Base, XML::SAX::Exception, XML::SAX::Expat and XML::Parser modules.
 
 =head2 Comments
 
@@ -146,6 +148,8 @@ an @.
 
 Tags must start at the beginning of a line.
 
+The special tag @BRIEF puts doc in 'Name' section (in book mode).
+
 The special tag @INCLUDE allows inclusion of the content of an external file.
 
  <!--
@@ -157,7 +161,9 @@ The special tag @INCLUDE allows inclusion of the content of an external file.
 
 =head1 SEE ALSO
 
-PerlSAX.pod(3), XML::Handler::Dtd2Html
+XML::SAX::Base , XML::SAX , XML::SAX::Expat , XML::Parser
+
+XML::Handler::Dtd2Html
 
 Extensible Markup Language (XML), E<lt>http://www.w3c.org/TR/REC-xmlE<gt>
 

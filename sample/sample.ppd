@@ -1,5 +1,9 @@
 <?xml version="1.0"?>
 <!DOCTYPE SOFTPKG SYSTEM "ppd.dtd">
+<!-- The following is a sample PPD file describing the Math-MatrixBool module. 
+     Note that this may not be a current/proper description of this module 
+     and is for sample purposes only.
+-->
  <SOFTPKG NAME="Math-MatrixBool" VERSION="4,2,0,0">
      <TITLE>Math-MatrixBool</TITLE>
      <ABSTRACT>Easy manipulation of matrices of booleans (Boolean Algebra)</ABSTRACT>

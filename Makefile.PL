@@ -7,7 +7,7 @@ WriteMakefile(
     'ABSTRACT'      => 'HTML documentation generator from a DTD',
     'PREREQ_PM'     => {
                         'XML::Parser'           => 0,
-                        'XML::Parser::PerlSAX'  => 0.07
+                        'XML::SAX::Expat'       => 0.36
     },
     'PM'            => {
                         'Dtd2Html.pm'   => '$(INST_LIBDIR)/Dtd2Html.pm',

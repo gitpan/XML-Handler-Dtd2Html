@@ -1,5 +1,10 @@
 Revision history for Perl extension XML::Handler::Dtd2Html.
 
+0.20  Fri Sep 27 18:30:00 2002
+	- now use XML::SAX::Expat (SAX 2.0), remove use XML::PerlSAX
+	- add -H option : disable href generation in doc comment
+	- add special tag @BRIEF
+
 0.14  Mon Sep 16 08:30:00 2002
 	- add tag in XML comment, special tag @INCLUDE
 	- add -x option : include example files
