@@ -17,13 +17,15 @@ sub new {
 	return $self;
 }
 
+###############################################################################
+
 package XML::Handler::Dtd2Html;
 
 use strict;
 
 use vars qw($VERSION);
 
-$VERSION="0.11";
+$VERSION="0.12";
 
 sub new {
 	my $proto = shift;
@@ -69,14 +71,9 @@ sub notation_decl {
 sub unparsed_entity_decl {
 	my $self = shift;
 	my ($decl) = @_;
-	if (scalar @{$self->{comments}}) {
-		$decl->{comments} = [@{$self->{comments}}];
-		$self->{comments} = [];
-	}
-	$decl->{type} = "unparsed_entity";
 	my $name = $decl->{Name};
-	$self->{doc}->{hash_entity}->{$name} = $decl;
-	push @{$self->{doc}->{list_decl}}, $decl;
+	warn "unparsed entity $name.\n";
+	warn "Please patch XML::Parser::PerlSAX v0.07 (see the embedded pod or the readme).\n";
 }
 
 sub entity_decl {
@@ -131,6 +128,8 @@ sub doctype_decl {
 	}
 	$self->{doc}->{doctype_decl} = $decl;
 	$self->{doc}->{root_name} = $decl->{Name};
+	die "Please patch XML::Parser::PerlSAX v0.07 (see the embedded pod or the readme).\n"
+			if (exists $decl->{SystemId});
 }
 
 sub xml_decl {
@@ -138,11 +137,13 @@ sub xml_decl {
 	$self->{doc}->{xml_decl} = shift;
 }
 
+###############################################################################
+
 package XML::Handler::Dtd2Html::Document;
 
 sub _cross_ref {
 	my $self = shift;
-	my($flag_zombi) = @_;
+	my($flag_zombi, $flag_multi) = @_;
 
 	while (my($name, $decl) = each %{$self->{hash_element}}) {
 		my $model = $decl->{Model};
@@ -186,52 +187,63 @@ sub _cross_ref {
 			}
 		}
 	}
+
+	if ($flag_multi) {
+		foreach my $decl (@{$self->{list_decl}}) {
+			my $type = $decl->{type};
+			my $name = $decl->{Name};
+			if (exists $decl->{comments}) {
+				$decl->{comments} = [ ${$decl->{comments}}[-1] ];
+			}
+			if ($type eq "element" and exists $self->{hash_attr}->{$name}) {
+				foreach my $attr (@{$self->{hash_attr}->{$name}}) {
+					if (exists $attr->{comments}) {
+						$attr->{comments} = [ ${$attr->{comments}}[-1] ];
+					}
+				}
+			}
+		}
+	}
 }
 
 sub _format_head {
 	my $self = shift;
-	my($FH, $title, $frameset) = @_;
+	my($FH, $title) = @_;
 	my $now = localtime();
 	print $FH "<?xml version='1.0' encoding='ISO-8859-1'?>\n";
-	if ($frameset) {
-		print $FH "<!DOCTYPE html PUBLIC '-//W3C//DTD XHTML 1.0 Frameset//EN' 'xhtml1-frameset.dtd'>\n";
-	} else {
-		print $FH "<!DOCTYPE html PUBLIC '-//W3C//DTD XHTML 1.0 Strict//EN' 'xhtml1-strict.dtd'>\n";
-	}
+	print $FH "<!DOCTYPE html PUBLIC '-//W3C//DTD XHTML 1.0 Strict//EN' 'xhtml1-strict.dtd'>\n";
 	print $FH "<html xmlns='http://www.w3.org/1999/xhtml'>\n";
 	print $FH "\n";
 	print $FH "  <head>\n";
+	print $FH "    <meta http-equiv='Content-Type' content='text/html; charset=ISO-8859-1' />\n";
 	print $FH "    <meta name='generator' content='dtd2html (Perl)' />\n";
 	print $FH "    <meta name='date' content='",$now,"' />\n";
-	print $FH "    <meta http-equiv='Content-Type' content='text/html; charset=ISO-8859-1' />\n";
 	print $FH "    <title>",$title,"</title>\n";
-	unless ($frameset) {
-		print $FH "    <style type='text/css'>\n";
-		print $FH "      h2 {color: red}\n";
-		print $FH "      span.keyword1 {color: teal}\n";
-		print $FH "      span.keyword2 {color: maroon}\n";
-		print $FH "      p.comment {color: green}\n";
-		print $FH "      span.comment {color: green}\n";
-		print $FH "      hr {text-align: center}\n";
-		print $FH "    </style>\n";
-	}
+	print $FH "    <style type='text/css'>\n";
+	print $FH "      a.index {font-weight: bold}\n";
+	print $FH "      hr {text-align: center}\n";
+	print $FH "      h2 {color: red}\n";
+	print $FH "      p.comment {color: green}\n";
+	print $FH "      span.comment {color: green}\n";
+	print $FH "      span.keyword1 {color: teal}\n";
+	print $FH "      span.keyword2 {color: maroon}\n";
+	print $FH "    </style>\n";
 	print $FH "  </head>\n";
 	print $FH "\n";
 }
 
 sub _format_tail {
 	my $self = shift;
-	my($FH, $frameset) = @_;
-	if ($frameset) {
-		print $FH "  <noframes>\n";
-		print $FH "    <body>\n";
-		print $FH "      <h1>Sorry!</h1>\n";
-		print $FH "      <h3>This page must be viewed by a browser that is capable of viewing frames.</h3>\n";
-		print $FH "    </body>\n";
-		print $FH "  </noframes>\n";
-	}
+	my($FH) = @_;
 	print $FH "\n";
 	print $FH "</html>\n";
+}
+
+sub _mk_model_anchor {
+	my $self = shift;
+	my($name) = @_;
+
+	return "<a href='#elt_" . $name . "'>" . $name . "</a>";
 }
 
 sub _format_content_model {
@@ -257,7 +269,7 @@ sub _format_content_model {
 					and $str .= "<span class='keyword1'>" . $1 . "</span>",
 					    last;
 			s/^([A-Za-z_:][0-9A-Za-z\.\-_:]*)//
-					and $str .= "<a href='#elt_" . $1 . "'>" . $1 . "</a>",
+					and $str .= $self->_mk_model_anchor($1),
 					    last;
 			s/^([\S]+)//
 					and warn __PACKAGE__,":_format_content_model INTERNAL_ERROR $1\n",
@@ -265,6 +277,13 @@ sub _format_content_model {
 		}
 	}
 	return $str;
+}
+
+sub _mk_text_anchor {
+	my $self = shift;
+	my($type, $name) = @_;
+
+	return "<a href='#" . $type . "_" . $name . "'>" . $name . "</a>";
 }
 
 sub _process_text {
@@ -285,13 +304,13 @@ sub _process_text {
 		if ($word =~ /^[A-Za-z_:][0-9A-Za-z\.\-_:]*$/) {
 			# looks like a DTD name
 			if (exists $self->{hash_notation}->{$word}) {
-				$word = "<a href='#not_" . $word . "'>" . $word . "</a>"
+				$word = $self->_mk_text_anchor("not", $word);
 			}
-			if (exists $self->{hash_entity}->{$word}) {
-				$word = "<a href='#ent_" . $word . "'>" . $word . "</a>"
+			elsif (exists $self->{hash_entity}->{$word}) {
+				$word = $self->_mk_text_anchor("ent", $word);
 			}
-			if (exists $self->{hash_element}->{$word}) {
-				$word = "<a href='#elt_" . $word . "'>" . $word . "</a>"
+			elsif (exists $self->{hash_element}->{$word}) {
+				$word = $self->_mk_text_anchor("elt", $word);
 			}
 		} elsif ($word =~ /^\w+:\/\/\w/) {
 			# looks like a URL
@@ -307,71 +326,85 @@ sub _process_text {
 	return $lead . join('', @words) . $trail;
 }
 
-sub generateAlpha {
+sub _mk_index_anchor {
 	my $self = shift;
-	my ($FH, $frameset, $outfile) = @_;
+	my($type, $name) = @_;
+
+	return "<a class='index' href='#" . $type . "_" . $name . "'>" . $name ."</a>";
+}
+
+sub generateAlphaElement {
+	my $self = shift;
+	my ($FH, $empty) = @_;
 
 	my @elements = sort keys %{$self->{hash_element}};
 	if (scalar @elements) {
-		print $FH "<h2>Element index.</h2>\n";
+		print $FH "<h2>Elements index.</h2>\n";
 		print $FH "<dl>\n";
 		foreach (@elements) {
-			if ($frameset) {
-				print $FH "    <dt><a target='main' href='",$outfile,".main.html#elt_",$_,"'><b>",$_,"</b></a>";
-			} else {
-				print $FH "    <dt><a href='#elt_",$_,"'><b>",$_,"</b></a>";
-			}
+			print $FH "    <dt>",$self->_mk_index_anchor("elt",$_);
 			print $FH " (root)" if ($_ eq $self->{root_name});
 			print $FH "</dt>\n";
 		}
 		print $FH "</dl>\n";
+	} elsif (defined $empty) {
+		print $FH "<h2>Elements index.</h2>\n";
+		print $FH "<dl><dt>NONE</dt></dl>\n";
 	}
+}
+
+sub generateAlphaEntity {
+	my $self = shift;
+	my ($FH, $empty) = @_;
+
 	my @entities = sort keys %{$self->{hash_entity}};
 	if (scalar @entities) {
-		print $FH "<h2>General Entity index.</h2>\n";
+		print $FH "<h2>Entities index.</h2>\n";
 		print $FH "<dl>\n";
 		foreach (@entities) {
-			if ($frameset) {
-				print $FH "    <dt><a target='main' href='",$outfile,".main.html#ent_",$_,"'><b>",$_,"</b></a></dt>\n";
-			} else {
-				print $FH "    <dt><a href='#ent_",$_,"'><b>",$_,"</b></a></dt>\n";
-			}
+			print $FH "    <dt>",$self->_mk_index_anchor("ent",$_),"</dt>\n";
 		}
 		print $FH "</dl>\n";
+	} elsif (defined $empty) {
+		print $FH "<h2>Entities index.</h2>\n";
+		print $FH "<dl><dt>NONE</dt></dl>\n";
 	}
+}
+
+sub generateAlphaNotation {
+	my $self = shift;
+	my ($FH, $empty) = @_;
+
 	my @notations = sort keys %{$self->{hash_notation}};
 	if (scalar @notations) {
-		print $FH "<h2>Notation index.</h2>\n";
+		print $FH "<h2>Notations index.</h2>\n";
 		print $FH "<dl>\n";
 		foreach (@notations) {
-			if ($frameset) {
-				print $FH "    <dt><a target='main' href='",$outfile,".main.html#not_",$_,"'><b>",$_,"</b></a></dt>\n";
-			} else {
-				print $FH "    <dt><a href='#not_",$_,"'><b>",$_,"</b></a></dt>\n";
-			}
+			print $FH "    <dt>",$self->_mk_index_anchor("not",$_),"</dt>\n";
 		}
 		print $FH "</dl>\n";
+	} elsif (defined $empty) {
+		print $FH "<h2>Notations index.</h2>\n";
+		print $FH "<dl><dt>NONE</dt></dl>\n";
 	}
 }
 
 sub _mk_tree {
 	my $self = shift;
-	my ($FH, $frameset, $outfile, $name) = @_;
+	my ($FH, $name) = @_;
 	my %done = ();
 
+	return if ($self->{hash_element}->{$name}->{done});
 	$self->{hash_element}->{$name}->{done} = 1;
+	return unless (scalar @{$self->{hash_element}->{$name}->{uses}});
+
 	print $FH "<ul>\n";
 	foreach (@{$self->{hash_element}->{$name}->{uses}}) {
 		next if ($_ eq $name);
 		next if (exists $done{$_});
 		$done{$_} = 1;
-		if ($frameset) {
-			print $FH "  <li><a target='main' href='",$outfile,".main.html#elt_",$_,"'><b>",$_,"</b></a>\n";
-		} else {
-			print $FH "  <li><a href='#elt_",$_,"'><b>",$_,"</b></a>\n";
-		}
-		$self->_mk_tree($FH, $frameset, $outfile, $_)
-				unless (exists $self->{hash_element}->{$_}->{done});
+		print $FH "  <li>",$self->_mk_index_anchor("elt",$_),"\n";
+		$self->_mk_tree($FH, $_);
 		print $FH "  </li>\n";
 	}
 	print $FH "</ul>\n";
@@ -379,25 +412,22 @@ sub _mk_tree {
 
 sub generateTree {
 	my $self = shift;
-	my ($FH, $frameset, $outfile) = @_;
+	my ($FH) = @_;
 
 	print $FH "<h2>Element tree.</h2>\n";
 	print $FH "<ul>\n";
-	if ($frameset) {
-		print $FH "  <li><a target='main' href='",$outfile,".main.html#elt_",$self->{root_name},"'><b>",$self->{root_name},"</b></a>\n";
-	} else {
-		print $FH "  <li><a href='#elt_",$self->{root_name},"'><b>",$self->{root_name},"</b></a>\n";
-	}
-	$self->_mk_tree($FH, $frameset, $outfile, $self->{root_name});
+	print $FH "  <li>",$self->_mk_index_anchor("elt",$self->{root_name}),"\n";
+	$self->_mk_tree($FH, $self->{root_name});
 	print $FH "  </li>\n";
 	print $FH "</ul>\n";
 }
 
 sub generateMain {
 	my $self = shift;
-	my ($FH, $flag_comment) = @_;
+	my ($FH) = @_;
 
 	if (defined $self->{doctype_decl}) {
+		my $name = $self->{doctype_decl}->{Name};
 		print $FH "<h3>Document entity</h3>\n";
 		print $FH "<p>";
 		if (defined $self->{xml_decl}) {
@@ -417,14 +447,13 @@ sub generateMain {
 			print $FH "?&gt;\n";
 			print $FH "<br />\n";
 		}
-		my $name = $self->{doctype_decl}->{Name};
-		print $FH "&lt;<span class='keyword1'>!DOCTYPE</font> ",$name," [\n";
+		print $FH "&lt;<span class='keyword1'>!DOCTYPE</span> ",$name," [\n";
 		print $FH "<pre>\n";
 		print $FH "\t...\n";
 		print $FH "]&gt;\n";
 		print $FH "</pre>\n";
 		print $FH "</p>\n";
-		if ($flag_comment) {
+		if ($self->{flag_comment}) {
 			foreach my $comment (@{$self->{doctype_decl}->{comments}}) {
 				my $data = $self->_process_text($comment->{Data});
 				print $FH "    <p class='comment'>",$data,"</p>\n";
@@ -449,19 +478,7 @@ sub generateMain {
 			} elsif (defined $systemId) {
 				print $FH "<span class='keyword1'>SYSTEM</span> '",$systemId,"'";
 			} else {
-				warn __PACKAGE__,":printToFileHandle INTERNAL_ERROR (NOTATION $name)\n";
-			}
-			print $FH " &gt;</p>\n";
-		} elsif ($type eq "unparsed_entity") {
-			my $systemId = $decl->{SystemId};
-			my $publicId = $decl->{PublicId};
-			print $FH "  <li>\n";
-			print $FH "    <h3><a id='ent_",$name,"' name='ent_",$name,"'/>",$name,"</h3>\n";
-			print $FH "<p>&lt;<span class='keyword1'>!ENTITY</span> ",$name," ";
-			if (defined $publicId) {
-				print $FH "<span class='keyword1'>PUBLIC</span> '",$publicId,"' '",$systemId,"'";
-			} else {
-				print $FH "<span class='keyword1'>SYSTEM</span> '",$systemId,"'";
+				warn __PACKAGE__,":generateMain INTERNAL_ERROR (NOTATION $name)\n";
 			}
 			print $FH " &gt;</p>\n";
 		} elsif ($type eq "entity") {
@@ -498,8 +515,7 @@ sub generateMain {
 					my $type = $attr->{Type};
 					my $default = $attr->{Default};
 					my $fixed = $attr->{Fixed};
-#					print $FH "<br/>\n";		Bug with Netscape 4.7
-					print $FH "<br />\n";		# Fix
+					print $FH "<br />\n";
 					print $FH "&lt;<span class='keyword1'>!ATTLIST</span> ",$name;
 					print $FH " ",$attr_name;
 					if       ( $type eq "CDATA"
@@ -525,9 +541,9 @@ sub generateMain {
 			}
 			print $FH "</p>\n";
 		} else {
-			warn __PACKAGE__,":printToFileHandle INTERNAL_ERROR (type:$type)\n";
+			warn __PACKAGE__,":generateMain INTERNAL_ERROR (type:$type)\n";
 		}
-		if ($flag_comment) {
+		if ($self->{flag_comment}) {
 			if (exists $decl->{comments}) {
 				foreach my $comment (@{$decl->{comments}}) {
 					my $data = $self->_process_text($comment->{Data});
@@ -535,31 +551,41 @@ sub generateMain {
 				}
 			}
 			if ($type eq "element" and exists $self->{hash_attr}->{$name}) {
-				print $FH "  <ul>\n";
+				my $nb = 0;
 				foreach my $attr (@{$self->{hash_attr}->{$name}}) {
-					if (exists $attr->{comments}) {
-						my $attr_name = $attr->{AttributeName};
-						print $FH "    <li>",$attr_name," : <span class='comment'>\n";
-						my $first = 1;
-						foreach my $comment (@{$attr->{comments}}) {
-							my $data = $self->_process_text($comment->{Data});
-							print $FH "<p>\n" unless ($first);
-							print $FH $data,"\n";
-							print $FH "</p>\n" unless ($first);
-							$first = 0;
-						}
-						print $FH "    </span></li>\n";
-					}
+					$nb ++ if (exists $attr->{comments});
 				}
-				print $FH "  </ul>\n";
+				if ($nb) {
+					print $FH "  <ul>\n";
+					foreach my $attr (@{$self->{hash_attr}->{$name}}) {
+						if (exists $attr->{comments}) {
+							my $attr_name = $attr->{AttributeName};
+							print $FH "    <li>",$attr_name," : <span class='comment'>\n";
+							my $first = 1;
+							foreach my $comment (@{$attr->{comments}}) {
+								my $data = $self->_process_text($comment->{Data});
+								print $FH "<p>\n" unless ($first);
+								print $FH $data,"\n";
+								print $FH "</p>\n" unless ($first);
+								$first = 0;
+							}
+							print $FH "    </span></li>\n";
+						}
+					}
+					print $FH "  </ul>\n";
+				}
 			}
 		}
-		if ($type eq "element" and scalar keys %{$decl->{used_by}} != 0) {
-			print $FH "  <p>Child of : ";
-			foreach (sort keys %{$decl->{used_by}}) {
-				print $FH "<a href='#elt_",$_,"'>",$_,"</a> ";
+		if ($type eq "element") {
+			if (scalar keys %{$decl->{used_by}} != 0) {
+				print $FH "  <p>Child of : ";
+				foreach (sort keys %{$decl->{used_by}}) {
+					print $FH "<a href='#elt_",$_,"'>",$_,"</a> ";
+				}
+				print $FH "  </p>\n";
+			} else {
+				print $FH "  <p />\n";
 			}
-			print $FH "  </p>\n";
 		}
 		print $FH "  </li>\n";
 	}
@@ -568,83 +594,619 @@ sub generateMain {
 
 sub generateHTML {
 	my $self = shift;
-	my ($outfile, $frameset, $title, $flag_comment, $flag_multi, $flag_zombi) = @_;
-
-	$self->_cross_ref($flag_zombi);
+	my ($outfile, $title, $flag_comment, $flag_multi, $flag_zombi) = @_;
 
 	$title = "DTD " . $self->{root_name}
 			unless (defined $title);
 
-	if ($flag_multi) {
-		foreach my $decl (@{$self->{list_decl}}) {
-			if (exists $decl->{comments}) {
-				$decl->{comments} = [ ${$decl->{comments}}[-1] ];
+	$self->_cross_ref($flag_zombi, $flag_multi);
+
+	$self->{filebase} = $outfile;
+	$self->{filebase} =~ s/^([^\/]+\/)+//;
+	$self->{flag_comment} = $flag_comment;
+
+	open OUT, "> $outfile.html"
+			or die "can't open $outfile.html ($!)\n";
+	$self->_format_head(\*OUT, $title);
+	print OUT "  <body>\n";
+	print OUT "    <h1>",$title,"</h1>\n";
+	print OUT "    <hr />\n";
+	$self->generateAlphaElement(\*OUT);
+	$self->generateAlphaEntity(\*OUT);
+	$self->generateAlphaNotation(\*OUT);
+	print OUT "    <hr />\n";
+	if (scalar keys %{$self->{hash_element}}) {
+		$self->generateTree(\*OUT);
+		print OUT "    <hr />\n";
+	}
+	$self->generateMain(\*OUT);
+	print OUT "    <hr />\n";
+	print OUT "    <div><cite>Generated by dtd2html</cite></div>\n";
+	print OUT "\n";
+	print OUT "  </body>\n";
+	print OUT "\n";
+	$self->_format_tail(\*OUT);
+	close OUT;
+}
+
+###############################################################################
+
+package XML::Handler::Dtd2Html::DocumentFrame;
+
+@XML::Handler::Dtd2Html::DocumentFrame::ISA = qw(XML::Handler::Dtd2Html::Document);
+
+sub _format_head {
+	my $self = shift;
+	my($FH, $title) = @_;
+	my $now = localtime();
+	print $FH "<?xml version='1.0' encoding='ISO-8859-1'?>\n";
+	print $FH "<!DOCTYPE html PUBLIC '-//W3C//DTD XHTML 1.0 Frameset//EN' 'xhtml1-frameset.dtd'>\n";
+	print $FH "<html xmlns='http://www.w3.org/1999/xhtml'>\n";
+	print $FH "\n";
+	print $FH "  <head>\n";
+	print $FH "    <meta http-equiv='Content-Type' content='text/html; charset=ISO-8859-1' />\n";
+	print $FH "    <meta name='generator' content='dtd2html (Perl)' />\n";
+	print $FH "    <meta name='date' content='",$now,"' />\n";
+	print $FH "    <title>",$title,"</title>\n";
+	print $FH "  </head>\n";
+	print $FH "\n";
+}
+
+sub _mk_index_anchor {
+	my $self = shift;
+	my($type, $name) = @_;
+
+	return "<a class='index' target='main' href='" . $self->{filebase} . ".main.html#" . $type . "_" . $name ."'>" . $name . "</a>";
+}
+
+sub generateHTML {
+	my $self = shift;
+	my ($outfile, $title, $flag_comment, $flag_multi, $flag_zombi) = @_;
+
+	$title = "DTD " . $self->{root_name}
+			unless (defined $title);
+
+	$self->_cross_ref($flag_zombi, $flag_multi);
+
+	$self->{filebase} = $outfile;
+	$self->{filebase} =~ s/^([^\/]+\/)+//;
+	$self->{flag_comment} = $flag_comment;
+
+	open OUT, "> $outfile.html"
+			or die "can't open $outfile.html ($!)\n";
+	$self->_format_head(\*OUT, $title);
+	print OUT "  <frameset cols='25%,75%'>\n";
+	print OUT "    <frameset rows='50%,50%'>\n";
+	print OUT "      <frame src='",$self->{filebase},".alpha.html' id='alpha' name='alpha'/>\n";
+	print OUT "      <frame src='",$self->{filebase},".tree.html' id='tree' name='tree'/>\n";
+	print OUT "    </frameset>\n";
+	print OUT "    <frame src='",$self->{filebase},".main.html' id='main' name='main'/>\n";
+	print OUT "    <noframes>\n";
+	print OUT "      <body>\n";
+	print OUT "        <h1>Sorry!</h1>\n";
+	print OUT "        <h3>This page must be viewed by a browser that is capable of viewing frames.</h3>\n";
+	print OUT "      </body>\n";
+	print OUT "    </noframes>\n";
+	print OUT "  </frameset>\n";
+	$self->_format_tail(\*OUT);
+	close OUT;
+
+	open OUT, "> $outfile.alpha.html"
+			or die "can't open $outfile.alpha.html ($!)\n";
+	$self->SUPER::_format_head(\*OUT, $title . " (Index)");
+	print OUT "  <body>\n";
+	$self->generateAlphaElement(\*OUT);
+	$self->generateAlphaEntity(\*OUT);
+	$self->generateAlphaNotation(\*OUT);
+	print OUT "  </body>\n";
+	$self->_format_tail(\*OUT);
+	close OUT;
+
+	open OUT, "> $outfile.tree.html"
+			or die "can't open $outfile.tree.html ($!)\n";
+	$self->SUPER::_format_head(\*OUT, $title . " (Tree)");
+	print OUT "  <body>\n";
+	$self->generateTree(\*OUT);
+	print OUT "  </body>\n";
+	$self->_format_tail(\*OUT);
+	close OUT;
+
+	open OUT, "> $outfile.main.html"
+			or die "can't open $outfile.main.html ($!)\n";
+	$self->SUPER::_format_head(\*OUT, $title . " (Main)");
+	print OUT "  <body>\n";
+	print OUT "    <h1>",$title,"</h1>\n";
+	print OUT "    <hr />\n";
+	$self->generateMain(\*OUT);
+	print OUT "    <hr />\n";
+	print OUT "    <div><cite>Generated by dtd2html</cite></div>\n";
+	print OUT "  </body>\n";
+	$self->_format_tail(\*OUT);
+	close OUT;
+}
+
+###############################################################################
+
+package XML::Handler::Dtd2Html::DocumentBook;
+
+@XML::Handler::Dtd2Html::DocumentBook::ISA = qw(XML::Handler::Dtd2Html::Document);
+
+sub _format_head {
+	my $self = shift;
+	my($FH, $title, $links) = @_;
+	my $now = localtime();
+	print $FH "<?xml version='1.0' encoding='ISO-8859-1'?>\n";
+	print $FH "<!DOCTYPE html PUBLIC '-//W3C//DTD XHTML 1.0 Strict//EN' 'xhtml1-strict.dtd'>\n";
+	print $FH "<html xmlns='http://www.w3.org/1999/xhtml'>\n";
+	print $FH "\n";
+	print $FH "  <head>\n";
+	print $FH "    <meta http-equiv='Content-Type' content='text/html; charset=ISO-8859-1' />\n";
+	print $FH $links
+			if (defined $links);
+	print $FH "    <meta name='generator' content='dtd2html (Perl)' />\n";
+	print $FH "    <meta name='date' content='",$now,"' />\n";
+	print $FH "    <title>",$title,"</title>\n";
+	print $FH "    <style type='text/css'>\n";
+	print $FH "      a.index {font-weight: bold}\n";
+	print $FH "      hr {text-align: center}\n";
+	print $FH "      table.synopsys {background-color: #DCDCDC}\n";	# gainsboro
+	print $FH "      td.title {font-style: italic}\n";
+	print $FH "    </style>\n";
+	print $FH "  </head>\n";
+	print $FH "\n";
+}
+
+sub _mk_model_anchor {
+	my $self = shift;
+	my($name) = @_;
+	my $uri_name = $name;
+	$uri_name =~ s/:/_/g;
+
+	return "<a href='" . $self->{filebase} . ".elt." . $uri_name . ".html'>" . $name . "</a>",
+}
+
+sub _mk_text_anchor {
+	my $self = shift;
+	my($type, $name) = @_;
+	my $uri_name = $name;
+	$uri_name =~ s/:/_/g;
+
+	return "<a href='" . $self->{filebase} . "." . $type . "." . $uri_name . ".html'>" . $name . "</a>";
+}
+
+sub _mk_nav_anchor {
+	my $self = shift;
+	my($type, $name, $accesskey, $label) = @_;
+
+	return "&nbsp;" unless ($name);
+
+	my $uri = $name;
+	$uri =~ s/[ :]/_/g;
+
+	return "<a href='" . $self->{filebase} . "." . $type . "." . $uri . ".html' accesskey='" . $accesskey . "'>" . $label . "</a>";
+}
+
+sub generatePageHeader {
+	my $self = shift;
+	my ($FH, $title, $type_p, $prev, $type_n, $next) = @_;
+
+	print $FH "<div class='navheader'>\n";
+	print $FH "  <table summary='Header navigation table' width='100%' border='0' cellpadding='0' cellspacing='0'>\n";
+	print $FH "    <colgroup><col width='20%'/><col width='60%'/><col width='20%'/></colgroup>\n";
+	print $FH "    <tr>\n";
+	print $FH "      <th colspan='3' align='center'>",$title,"</th>\n";
+	print $FH "    </tr>\n";
+	print $FH "    <tr>\n";
+	print $FH "      <td align='left' valign='bottom'>\n";
+	print $FH "        ",$self->_mk_nav_anchor($type_p,$prev,"P","&lt;&lt;&lt; Previous"),"\n";
+	print $FH "      </td>\n";
+	print $FH "      <td align='center' valign='bottom'/>\n";
+	print $FH "      <td align='right' valign='bottom'>\n";
+	print $FH "        ",$self->_mk_nav_anchor($type_n,$next,"N","Next &gt;&gt;&gt;"),"\n";
+	print $FH "      </td>\n";
+	print $FH "    </tr>\n";
+	print $FH "  </table>\n";
+	print $FH "  <hr />\n";
+	print $FH "</div>\n";
+}
+
+sub generatePageFooter {
+	my $self = shift;
+	my ($FH, $type_p, $prev, $type_n, $next, $up) = @_;
+
+	print $FH "<div class='navfooter'>\n";
+	print $FH "  <hr />\n";
+	print $FH "  <table summary='Footer navigation table' width='100%' border='0' cellpadding='0' cellspacing='0'>\n";
+	print $FH "    <colgroup><col width='33%'/><col width='34%'/><col width='33%'/></colgroup>\n";
+	print $FH "    <tr>\n";
+	print $FH "      <td align='left' valign='top'>\n";
+	print $FH "        ",$self->_mk_nav_anchor($type_p,$prev,"P","&lt;&lt;&lt; Previous"),"\n";
+	print $FH "      </td>\n";
+	print $FH "      <td align='center' valign='top'>\n";
+	print $FH "        ",$self->_mk_nav_anchor("book","home","H","Home"),"\n";
+	print $FH "      </td>\n";
+	print $FH "      <td align='right' valign='top'>\n";
+	print $FH "        ",$self->_mk_nav_anchor($type_n,$next,"N","Next &gt;&gt;&gt;"),"\n";
+	print $FH "      </td>\n";
+	print $FH "    </tr>\n";
+	print $FH "    <tr>\n";
+	print $FH "      <td align='left' valign='top'>",($prev ? $prev : "&nbsp;"),"</td>\n";
+	print $FH "      <td align='center' valign='top'>\n";
+	print $FH "        ",$self->_mk_nav_anchor("book",$up,"U","Up"),"\n";
+	print $FH "      </td>\n";
+	print $FH "      <td align='right' valign='top'>",($next ? $next : "&nbsp;"),"</td>\n";
+	print $FH "    </tr>\n";
+	print $FH "  </table>\n";
+	print $FH "</div>\n";
+}
+
+sub generatePage {
+	my $self = shift;
+	my ($FH, $decl) = @_;
+
+	my $type = $decl->{type};
+	my $name = $decl->{Name};
+	if      ($type eq "notation") {
+		print $FH "<h1>Notation $name</h1>\n";
+	} elsif ($type eq "unparsed_entity") {
+		print $FH "<h1>Entity $name</h1>\n";
+	} elsif ($type eq "entity") {
+		print $FH "<h1>Entity $name</h1>\n";
+	} elsif ($type eq "element") {
+		print $FH "<h1>Element $name</h1>\n";
+	}
+	print $FH "<h2>Name</h2>\n";
+	print $FH "<p>$name\n";
+	if ($self->{flag_comment} and exists $decl->{comments}) {
+		my $comment = ${$decl->{comments}}[0]->{Data};
+		if ($comment =~ /^([^,;:\.]+)/) {
+			print $FH " -- ",$1;
+		}
+	}
+	print $FH "</p>\n";
+	print $FH "<h2>Synopsys</h2>\n";
+	if      ($type eq "notation") {
+		my $publicId = $decl->{PublicId};
+		my $systemId = $decl->{SystemId};
+		print $FH "<table class='synopsys' border='1' cellspacing='0' cellpadding='4'>\n";
+		print $FH "<tr><td class='title'>Name</td>";
+		if (defined $publicId) {
+			print $FH "<td class='title'>Public</td>";
+		}
+		if (defined $systemId) {
+			print $FH "<td class='title'>System</td>";
+		}
+		print $FH "</tr>\n";
+		print $FH "<tr><td>",$name,"</td>";
+		if (defined $publicId) {
+			print $FH "<td>",$publicId,"</td>";
+		}
+		if (defined $systemId) {
+			print $FH "<td>",$systemId,"</td>";
+		}
+		print $FH "</tr>\n";
+		print $FH "</table>\n";
+	} elsif ($type eq "entity") {
+		my $value = $decl->{Value};
+		my $systemId = $decl->{SystemId};
+		my $publicId = $decl->{PublicId};
+		my $notation = $decl->{Notation};
+		print $FH "<table class='synopsys' border='1' cellspacing='0' cellpadding='4'>\n";
+		if (defined $value) {
+			print $FH "<tr><td class='title'>Name</td><td class='title'>Value</td></tr>\n";
+			print $FH "<tr><td>",$name,"</td><td>",$value,"</td></tr>\n";
+		} else {
+			print $FH "<tr><td class='title'>Name</td>";
+			if (defined $publicId) {
+				print $FH "<td class='title'>Public</td>";
+			}
+			print $FH "<td class='title'>System</td>";
+			if (defined $notation) {
+				print $FH "<td class='title'>Notation</td>";
+			}
+			print $FH "</tr>\n";
+			print $FH "<tr><td>",$name,"</td>";
+			if (defined $publicId) {
+				print $FH "<td>",$publicId,"</td>";
+			}
+			print $FH "<td>",$systemId,"</td>";
+			if (defined $notation) {
+				print $FH "<td>",$notation,"</td>";
+			}
+			print $FH "</tr>\n";
+		}
+		print $FH "</table>\n";
+	} elsif ($type eq "element") {
+		my $model = $decl->{Model};
+		my $type_model = "Element Content Model";
+		if      ($model =~ /#PCDATA/) {
+			$type_model = "Mixed Content Model";
+		} elsif ($model =~ /(ANY|EMPTY)/) {
+			$type_model = "Content Model";
+		}
+		my $f_model = $self->_format_content_model($model);
+		print $FH "<table class='synopsys' border='1' cellspacing='0' cellpadding='4'>\n";
+		print $FH "<tr><td class='title' colspan='3'>",$type_model,"</td></tr>\n";
+		print $FH "<tr><td colspan='3'>",$name," ::= <br />",$f_model,"</td></tr>\n";
+		print $FH "<tr><td class='title' colspan='3'>Attributes</td></tr>\n";
+		if (exists $self->{hash_attr}->{$name}) {
+			print $FH "<tr><td class='title'>Name</td><td class='title'>Type</td><td class='title'>Default</td></tr>\n";
+			foreach my $attr (@{$self->{hash_attr}->{$name}}) {
+				my $attr_name = $attr->{AttributeName};
+				my $type = $attr->{Type};
+				my $default = $attr->{Default};
+				my $fixed = $attr->{Fixed};
+				$default = "#FIXED " . $default if (defined $fixed);
+				print $FH "<tr><td>",$attr_name,"</td><td>",$type,"</td><td>",$default,"</td></tr>\n";
+			}
+		} else {
+			print $FH "<tr><td colspan='3'>None</td></tr>\n";
+		}
+		print $FH "</table>\n";
+	} else {
+		warn __PACKAGE__,":generatePage INTERNAL_ERROR (type:$type)\n";
+	}
+	if ($self->{flag_comment}) {
+		print $FH "<h2>Description</h2>\n";
+		if (exists $decl->{comments}) {
+			foreach my $comment (@{$decl->{comments}}) {
+				my $data = $self->_process_text($comment->{Data});
+				print $FH "    <p>",$data,"</p>\n";
+			}
+		}
+		if ($type eq "element" and exists $self->{hash_attr}->{$name}) {
+			my $nb = 0;
+			foreach my $attr (@{$self->{hash_attr}->{$name}}) {
+				$nb ++ if (exists $attr->{comments});
+			}
+			if ($nb) {
+				print $FH "  <ul>\n";
+				foreach my $attr (@{$self->{hash_attr}->{$name}}) {
+					if (exists $attr->{comments}) {
+						my $attr_name = $attr->{AttributeName};
+						print $FH "    <li><h4>",$attr_name,"</h4>\n";
+						foreach my $comment (@{$attr->{comments}}) {
+							my $data = $self->_process_text($comment->{Data});
+							print $FH "      <p>",$data,"</p>\n";
+						}
+						print $FH "    </li>\n";
+					}
+				}
+				print $FH "  </ul>\n";
 			}
 		}
 	}
-
-	if (defined $frameset) {
-		open OUT, "> $outfile.html"
-				or die "can't open $outfile.html ($!)\n";
-		$self->_format_head(\*OUT, $title, 1);
-		print OUT "  <frameset cols='25%,75%'>\n";
-		print OUT "    <frameset rows='50%,50%'>\n";
-		print OUT "      <frame src='",$outfile,".alpha.html' id='alpha' name='alpha'/>\n";
-		print OUT "      <frame src='",$outfile,".tree.html' id='tree' name='tree'/>\n";
-		print OUT "    </frameset>\n";
-		print OUT "    <frame src='",$outfile,".main.html' id='main' name='main'/>\n";
-		print OUT "  </frameset>\n";
-		$self->_format_tail(\*OUT, 1);
-		close OUT;
-		open OUT, "> $outfile.alpha.html"
-				or die "can't open $outfile.alpha.html ($!)\n";
-		$self->_format_head(\*OUT, $title . " (Index)", 0);
-		print OUT "  <body>\n";
-		$self->generateAlpha(\*OUT, 1, $outfile);
-		print OUT "  </body>\n";
-		$self->_format_tail(\*OUT, 0);
-		close OUT;
-		open OUT, "> $outfile.tree.html"
-				or die "can't open $outfile.tree.html ($!)\n";
-		$self->_format_head(\*OUT, $title . " (Tree)", 0);
-		print OUT "  <body>\n";
-		$self->generateTree(\*OUT, 1, $outfile);
-		print OUT "  </body>\n";
-		$self->_format_tail(\*OUT, 0);
-		close OUT;
-		open OUT, "> $outfile.main.html"
-				or die "can't open $outfile.main.html ($!)\n";
-		$self->_format_head(\*OUT, $title . " (Main)", 0);
-		print OUT "  <body>\n";
-		print OUT "    <h1>",$title,"</h1>\n";
-		print OUT "    <hr />\n";
-		$self->generateMain(\*OUT, $flag_comment);
-		print OUT "    <hr />\n";
-		print OUT "    <cite>Generated by dtd2html</cite>\n";
-		print OUT "  </body>\n";
-		$self->_format_tail(\*OUT, 0);
-		close OUT;
-	} else {
-		open OUT, "> $outfile.html"
-				or die "can't open $outfile.html ($!)\n";
-		$self->_format_head(\*OUT, $title, 0);
-		print OUT "  <body>\n";
-		print OUT "    <h1>",$title,"</h1>\n";
-		print OUT "    <hr />\n";
-		$self->generateAlpha(\*OUT, 0);
-		print OUT "    <hr />\n";
-		if (scalar keys %{$self->{hash_element}}) {
-			$self->generateTree(\*OUT, 0);
-			print OUT "    <hr />\n";
+	print $FH "<!-- HERE, insert extra data -->\n";
+	if ($type eq "element") {
+		if (scalar @{$decl->{uses}} != 0) {
+			print $FH "<h3>Parents</h3>\n";
+			print $FH "  <p>These elements contain configure: ";
+			foreach (sort @{$decl->{uses}}) {
+				print $FH $self->_mk_model_anchor($_),", ";
+			}
+			print $FH "  </p>\n";
 		}
-		$self->generateMain(\*OUT, $flag_comment);
-		print OUT "    <hr />\n";
-		print OUT "    <cite>Generated by dtd2html</cite>\n";
-		print OUT "\n";
-		print OUT "  </body>\n";
-		print OUT "\n";
-		$self->_format_tail(\*OUT, 0);
-		close OUT;
+		if (scalar keys %{$decl->{used_by}} != 0) {
+			print $FH "<h3>Children</h3>\n";
+			print $FH "  <p>The following elements occur in configure: ";
+			foreach (sort keys %{$decl->{used_by}}) {
+				print $FH $self->_mk_model_anchor($_),", ";
+			}
+			print $FH "  </p>\n";
+		} else {
+			print $FH "  <p />\n";
+		}
+	}
+}
+
+sub _mk_index_anchor {
+	my $self = shift;
+	my($type, $name) = @_;
+
+	my $uri = $name;
+	$uri =~ s/[:]/_/g;
+
+	return "<a class='index' href='" . $self->{filebase} . "." . $type . "." . $uri . ".html'>" . $name ."</a>";
+}
+
+sub _mk_outfile {
+	my $self = shift;
+	my($outfile, $type, $name) = @_;
+
+	my $uri = $name;
+	$uri =~ s/[ :]/_/g;
+
+	return $outfile . "." . $type . "." . $uri . ".html";
+}
+
+sub _mk_link {
+	my $self = shift;
+	my($rel, $title, $type, $name) = @_;
+
+	return "" unless ($name);
+
+	my $uri = $name;
+	$uri =~ s/[ :]/_/g;
+
+	return "<link rel='" . $rel . "' title='" . $title . "' href='" . $self->{filebase} . "." . $type . "." . $uri . ".html'/>\n";
+}
+
+sub generateHTML {
+	my $self = shift;
+	my ($outfile, $title, $flag_comment, $flag_multi, $flag_zombi) = @_;
+	my $links;
+
+	$title = "DTD " . $self->{root_name}
+			unless (defined $title);
+
+	$self->_cross_ref($flag_zombi, $flag_multi);
+
+	$self->{filebase} = $outfile;
+	$self->{filebase} =~ s/^([^\/]+\/)+//;
+	$self->{flag_comment} = $flag_comment;
+
+	my $filename = $self->_mk_outfile($outfile,"book","home");
+	open OUT, "> $filename"
+			or die "can't open $filename ($!)\n";
+	$self->_format_head(\*OUT, $title);
+	print OUT "  <body>\n";
+	$self->generatePageHeader(\*OUT, $title, "", "", "", "");
+	print OUT "<h2><a href='",$self->{filebase},".book.elements_index.html'>Elements index.</a></h2>\n";
+	print OUT "<h2><a href='",$self->{filebase},".book.entities_index.html'>Entities index.</a></h2>\n";
+	print OUT "<h2><a href='",$self->{filebase},".book.notations_index.html'>Notations index.</a></h2>\n";
+	$self->generateTree(\*OUT);
+	$self->generatePageFooter(\*OUT, "", "", "", "", "");
+	print OUT "  </body>\n";
+	$self->_format_tail(\*OUT);
+	close OUT;
+
+	$filename = $self->_mk_outfile($outfile,"book","elements_index");
+	$links = $self->_mk_link("Prev", $title, "book", "home");
+	$links .= $self->_mk_link("Next", "Entities index.", "book", "entities index");
+	open OUT, "> $filename"
+			or die "can't open $filename ($!)\n";
+	$self->_format_head(\*OUT, "Elements Index.", $links);
+	print OUT "  <body>\n";
+	$self->generatePageHeader(\*OUT, $title, "book", "home", "book", "entities index");
+	$self->generateAlphaElement(\*OUT, 1);
+	$self->generatePageFooter(\*OUT, "book", "home", "book", "entities index", "home");
+	print OUT "  </body>\n";
+	$self->_format_tail(\*OUT);
+	close OUT;
+
+	my @elements = sort keys %{$self->{hash_element}};
+	if (scalar @elements) {
+		my @prevs = @elements;
+		my @nexts = @elements;
+		pop @prevs;
+		unshift @prevs, "elements index";
+		shift @nexts;
+		push @nexts, "";
+		my $first = 1;
+		foreach (@elements) {
+			my $decl = $self->{hash_element}->{$_};
+			my $type_p = $first ? "book" : "elt";
+			my $type_n = "elt";
+			my $prev = shift @prevs;
+			my $next = shift @nexts;
+			my $filename = $self->_mk_outfile($outfile,$type_n,$_);
+			if ($first) {
+				$links = $self->_mk_link("Prev", "Elements index.", $type_p, $prev);
+			} else {
+				$links = $self->_mk_link("Prev", "Element " . $prev, $type_p, $prev);
+			}
+			$links .= $self->_mk_link("Next", "Element " . $next, $type_n, $next);
+			open OUT, "> $filename"
+					or die "can't open $filename ($!)\n";
+			$self->_format_head(\*OUT, "Element " . $_, $links);
+			print OUT "  <body>\n";
+			$self->generatePageHeader(\*OUT, $title, $type_p, $prev, $type_n, $next);
+			$self->generatePage(\*OUT, $decl);
+			$self->generatePageFooter(\*OUT, $type_p, $prev, $type_n, $next, "elements index");
+			print OUT "  </body>\n";
+			$self->_format_tail(\*OUT);
+			close OUT;
+			$first = 0;
+		}
+	}
+
+	$filename = $self->_mk_outfile($outfile,"book","entities_index");
+	$links = $self->_mk_link("Prev", "Elements index.", "book", "elements index");
+	$links .= $self->_mk_link("Next", "Notations index.", "book", "notations index");
+	open OUT, "> $filename"
+			or die "can't open $filename ($!)\n";
+	$self->_format_head(\*OUT, "Entities Index.", $links);
+	print OUT "  <body>\n";
+	$self->generatePageHeader(\*OUT, $title, "book", "elements index", "book", "notations index");
+	$self->generateAlphaEntity(\*OUT, 1);
+	$self->generatePageFooter(\*OUT, "book", "elements index", "book", "notations index", "home");
+	print OUT "  </body>\n";
+	$self->_format_tail(\*OUT);
+	close OUT;
+
+	my @entities = sort keys %{$self->{hash_entity}};
+	if (scalar @entities) {
+		my @prevs = @entities;
+		my @nexts = @entities;
+		pop @prevs;
+		unshift @prevs, "entities index";
+		shift @nexts;
+		push @nexts, "";
+		my $first = 1;
+		foreach (@entities) {
+			my $decl = $self->{hash_entity}->{$_};
+			my $type_p = $first ? "book" : "ent";
+			my $type_n = "ent";
+			my $prev = shift @prevs;
+			my $next = shift @nexts;
+			my $filename = $self->_mk_outfile($outfile,$type_n,$_);
+			if ($first) {
+				$links = $self->_mk_link("Prev", "Entities index." , $type_p, $prev);
+			} else {
+				$links = $self->_mk_link("Prev", "Entity " . $prev, $type_p, $prev);
+			}
+			$links .= $self->_mk_link("Next", "Entity " . $next, $type_n, $next);
+			open OUT, "> $filename"
+					or die "can't open $filename ($!)\n";
+			$self->_format_head(\*OUT, "Entity " . $_, $links);
+			print OUT "  <body>\n";
+			$self->generatePageHeader(\*OUT, $title, $type_p, $prev, $type_n, $next);
+			$self->generatePage(\*OUT, $decl);
+			$self->generatePageFooter(\*OUT, $type_p, $prev, $type_n, $next, "entities index");
+			print OUT "  </body>\n";
+			$self->_format_tail(\*OUT);
+			close OUT;
+			$first = 0;
+		}
+	}
+
+	$filename = $self->_mk_outfile($outfile,"book","notations_index");
+	$links = $self->_mk_link("Prev", "Entities index.", "book", "entities index");
+	open OUT, "> $filename"
+			or die "can't open $filename ($!)\n";
+	$self->_format_head(\*OUT, "Notations Index.", $links);
+	print OUT "  <body>\n";
+	$self->generatePageHeader(\*OUT, $title, "book", "entities index", "", "");
+	$self->generateAlphaNotation(\*OUT, 1);
+	$self->generatePageFooter(\*OUT, "book", "entities index", "", "", "home");
+	print OUT "  </body>\n";
+	$self->_format_tail(\*OUT);
+	close OUT;
+
+	my @notations = sort keys %{$self->{hash_notation}};
+	if (scalar @notations) {
+		my @prevs = @notations;
+		my @nexts = @notations;
+		pop @prevs;
+		unshift @prevs, "notations_index";
+		shift @nexts;
+		push @nexts, "";
+		my $first = 1;
+		foreach (@notations) {
+			my $decl = $self->{hash_notation}->{$_};
+			my $type_p = $first ? "book" : "not";
+			my $type_n = "not";
+			my $prev = shift @prevs;
+			my $next = shift @nexts;
+			my $filename = $self->_mk_outfile($outfile,$type_n,$_);
+			if ($first) {
+				$links = $self->_mk_link("Prev", "Notations index.", $type_p, $prev);
+			} else {
+				$links = $self->_mk_link("Prev", "Notation " . $prev, $type_p, $prev);
+			}
+			$links .= $self->_mk_link("Next", "Notation " . $next, $type_n, $next);
+			open OUT, "> $filename"
+					or die "can't open $filename ($!)\n";
+			$self->_format_head(\*OUT, "Notation " . $_, $links);
+			print OUT "  <body>\n";
+			$self->generatePageHeader(\*OUT, $title, $type_p, $prev, $type_n, $next);
+			$self->generatePage(\*OUT, $decl);
+			$self->generatePageFooter(\*OUT, $type_p, $prev, $type_n, $next, "notations index");
+			print OUT "  </body>\n";
+			$self->_format_tail(\*OUT);
+			close OUT;
+			$first = 0;
+		}
 	}
 }
 
@@ -666,7 +1228,7 @@ XML::Handler::Dtd2Html - PerlSAX handler for generate a HTML documentation from 
   $my_parser = new XML::Parser::PerlSAX(Handler => $my_handler, ParseParamEnt => 1);
   $result = $my_parser->parse( [OPTIONS] );
 
-  $result->generateHTML($outfile, $frameset, $title);
+  $result->generateHTML($outfile, $title, $flag_comment, $flag_multi, $flag_zombi);
 
 =head1 DESCRIPTION
 

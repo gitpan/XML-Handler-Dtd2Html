@@ -12,7 +12,7 @@ WriteMakefile(
     'PM'            => {
                         'Dtd2Html.pm'   => '$(INST_LIBDIR)/Dtd2Html.pm',
     },
-    'EXE_FILES'     => ['dtd2html'],
+    'EXE_FILES'     => ['dtd2html.pl'],
     'AUTHOR'        => "Francois PERRAD (francois.perrad\@gadz.org)",
     'dist'          => {
                         'COMPRESS'      => 'gzip',

@@ -1,5 +1,13 @@
 Revision history for Perl extension XML::Handler::Dtd2Html.
 
+0.12  Tue Sep  3 19:30:00 2002
+	- rename dtd2html to dtd2html.pl
+	- option -M don't work with attribute's comment
+	- check the extension .dtd
+	- check PerlSAX patch
+	- bug with frame mode and output in subdirectory
+	- add -b option : generation mode "Book"
+
 0.11  Wed Aug 14 18:30:00 2002
 	- add a sample
 	- add options : frame mode, comment filter, ...
