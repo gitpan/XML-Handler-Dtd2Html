@@ -25,7 +25,7 @@ use strict;
 
 use vars qw($VERSION);
 
-$VERSION="0.31";
+$VERSION="0.32";
 
 sub new {
 	my $proto = shift;
@@ -177,7 +177,17 @@ sub _process_args {
 	if (defined $hash{title}) {
 		$self->{title} = $hash{title};
 	} else {
-		$self->{title} =  "DTD " . $self->{root_name};
+		foreach my $comment (@{$self->{dtd}->{comments}}) {
+			my ($doc, $r_tags) = $self->_extract_doc($comment);
+			foreach (@{$r_tags}) {
+				my ($href, $entry, $data) = @{$_};
+				if (uc($entry) eq "TITLE") {
+					$self->{title} = $data;
+				}
+			}
+		}
+		$self->{title} = "DTD " . $self->{root_name}
+				unless ($self->{title});
 	}
 
 	$self->{css} = $hash{css};
@@ -328,7 +338,7 @@ sub _extract_doc {
 			my $tag = $2;
 			my $value = $3;
 			$tag =~ s/\s*$//;
-			if ($tag eq "INCLUDE") {
+			if (uc($tag) eq "INCLUDE") {
 				$doc .= $self->_include_doc($value);
 			} else {
 				push @tags, [$href, $tag, $value];
@@ -337,7 +347,7 @@ sub _extract_doc {
 			my $href = $1;
 			my $tag = $2;
 			my $value = $3;
-			if ($tag eq "INCLUDE") {
+			if (uc($tag) eq "INCLUDE") {
 				$doc .= $self->_include_doc($value);
 			} else {
 				push @tags, [$href, $tag, $value];
@@ -549,7 +559,9 @@ sub _get_doc {
 			}
 			foreach (@{$r_tags}) {
 				my ($href, $entry, $data) = @{$_};
-				unless ($entry eq "BRIEF") {
+				unless (   uc($entry) eq "BRIEF"
+						or uc($entry) eq "HIDDEN"
+						or (uc($entry) eq "TITLE" and $decl->{type} eq "doctype") ) {
 					$data = $self->_process_text($data, $name, $href);
 					push @tag, {
 							entry	=> $entry,
@@ -581,7 +593,8 @@ sub _get_doc_attrs {
 					}
 					foreach (@{$r_tags}) {
 						my ($href, $entry, $data) = @{$_};
-						unless ($entry eq "BRIEF") {
+						unless (   uc($entry) eq "BRIEF"
+								or uc($entry) eq "HIDDEN" ) {
 							$data = $self->_process_text($data, $name, $href);
 							push @tag, {
 									entry	=> $entry,
@@ -600,6 +613,23 @@ sub _get_doc_attrs {
 	}
 
 	return \@doc_attrs;
+}
+
+sub _get_style {
+	my $self = shift;
+	my ($name) = @_;
+
+	my $style = "";
+	my $path = ${$self->{path_tmpl}}[-1];
+	open IN, "$path/$name"
+			or warn "can't open $path/$name ($!)",
+			return $style;
+
+	while (<IN>) {
+		$style .= $_;
+	}
+	close IN;
+	return $style;
 }
 
 sub generateMain {
@@ -813,13 +843,7 @@ sub GenerateHTML {
 
 	$self->_process_args(@_);
 
-	my $style = "      a.index {font-weight: bold}\n" .
-	            "      hr {text-align: center}\n" .
-	            "      h2 {color: red}\n" .
-	            "      p.comment {color: green}\n" .
-	            "      span.comment {color: green}\n" .
-	            "      span.keyword1 {color: teal}\n" .
-	            "      span.keyword2 {color: maroon}\n";
+	my $style = $self->_get_style("simple.css");
 
 	$self->generateCSS($style) if ($self->{css});
 
@@ -872,13 +896,7 @@ sub GenerateHTML {
 
 	$self->_process_args(@_);
 
-	my $style = "      a.index {font-weight: bold}\n" .
-	            "      hr {text-align: center}\n" .
-	            "      h2 {color: red}\n" .
-	            "      p.comment {color: green}\n" .
-	            "      span.comment {color: green}\n" .
-	            "      span.keyword1 {color: teal}\n" .
-	            "      span.keyword2 {color: maroon}\n";
+	my $style = $self->_get_style("frame.css");
 
 	$self->generateCSS($style) if ($self->{css});
 
@@ -984,7 +1002,7 @@ sub _get_brief {
 			foreach my $tag (@{$r_tags}) {
 				my $entry = ${$tag}[1];
 				my $data  = ${$tag}[2];
-				if ($entry eq "BRIEF") {
+				if (uc($entry) eq "BRIEF") {
 					return $data;
 				}
 			}
@@ -1099,12 +1117,18 @@ sub copyPNG {
 	my $self = shift;
 	use File::Copy;
 
-	my $path = $INC{'XML/Handler/Dtd2Html.pm'};
-	$path =~ s/\.pm$//i;
+	my $path = ${$self->{path_tmpl}}[-1];
 	my $outfile = $self->{outfile};
 	$outfile =~ s/(\/[^\/]+)+$//;
 	foreach my $img qw(next up home prev) {
+		unless ( -e "$path/$img.png") {
+			warn "can't find $path/$img.png.\n";
+			next;
+		}
 		copy("$path/$img.png", "$outfile/$img.png");
+		unless ( -e "$outfile/$img.png") {
+			warn "$outfile/$img.png is not copied.\n";
+		}
 	}
 }
 
@@ -1118,10 +1142,8 @@ sub GenerateHTML {
 
 	$self->_test_sensitive();
 
-	my $style = "      a.index {font-weight: bold}\n" .
-	            "      hr {text-align: center}\n" .
-	            "      table.synopsis {background-color: #DCDCDC}\n" .	# gainsboro
-	            "      td.title {font-style: italic}\n";
+	my $style = $self->_get_style("book.css");
+
 	$self->generateCSS($style) if ($self->{css});
 	$self->copyPNG();
 

@@ -12,7 +12,7 @@ my %opts;
 getopts('bCdfHMl:p:s:t:o:x:Z', \%opts);
 
 die "incoherent version between dtd2html.pl and Dtd2Hmtl.pm\n"
-		unless ($XML::Handler::Dtd2Html::VERSION eq "0.31");
+		unless ($XML::Handler::Dtd2Html::VERSION eq "0.32");
 
 my $file = $ARGV[0];
 die "No input file\n"
@@ -227,6 +227,12 @@ The special tag @INCLUDE allows inclusion of the content of an external file.
    @INCLUDE : description.txt
    @@See Also : REC-xml
  -->
+
+The special tag @HIDDEN don't put the data in the documentation.
+
+The special tag @TITLE before <!DOCTYPE> have the same effect as the option -t.
+
+The special tag are case insensitive.
 
 =head2 HTML Templates
 

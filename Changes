@@ -1,5 +1,10 @@
 Revision history for Perl extension XML::Handler::Dtd2Html.
 
+0.32  Tue Jul 22 12:30:00 2003
+	- put style sheets with templates
+	- add special 2 tags : TITLE and HIDDEN
+	- now, special tags are case insensitive
+
 0.31  Tue Jul 15 12:30:00 2003
 	- use XML-SAX-Expat 0.37 that needs no patch
 	- modif fr/element.tmpl

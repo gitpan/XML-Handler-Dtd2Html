@@ -15,6 +15,9 @@ home.png
 prev.png
 next.png
 up.png
+simple.css
+frame.css
+book.css
 main.tmpl
 example.tmpl
 en/_desc.tmpl
