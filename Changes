@@ -1,5 +1,11 @@
 Revision history for Perl extension XML::Handler::Dtd2Html.
 
+0.13  Thu Sep  5 20:30:00 2002
+	- suppress patch check
+	- bug in book mode : swap between children and parents
+	- add -s option : generate an external CSS file
+	- deals with not case sensitive file system (like Windows)
+
 0.12  Tue Sep  3 19:30:00 2002
 	- rename dtd2html to dtd2html.pl
 	- option -M don't work with attribute's comment

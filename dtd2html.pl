@@ -8,7 +8,7 @@ use XML::Parser::PerlSAX;
 use XML::Handler::Dtd2Html;
 
 my %opts;
-getopts('bCfMt:o:Z', \%opts);
+getopts('bCfMs:t:o:Z', \%opts);
 
 my $handler = new XML::Handler::Dtd2Html();
 my $parser = new XML::Parser::PerlSAX(Handler => $handler, ParseParamEnt => 1);
@@ -39,7 +39,7 @@ if      ($opts{b}) {
 	bless($doc, "XML::Handler::Dtd2Html::DocumentFrame");
 }
 
-$doc->generateHTML($outfile, $opts{t}, !exists($opts{C}), exists($opts{M}), exists($opts{Z}));
+$doc->generateHTML($outfile, $opts{t}, $opts{s}, !exists($opts{C}), exists($opts{M}), exists($opts{Z}));
 
 __END__
 
@@ -49,7 +49,7 @@ dtd2html - Generate a HTML documentation from a DTD
 
 =head1 SYNOPSYS
 
-dtd2html [B<-b> | B<-f>] [B<-C> | B<-M>] [B<-Z>] [B<-o> I<filename>] [B<-t> I<title>] I<xml_file>
+dtd2html [B<-b> | B<-f>] [B<-C> | B<-M>] [B<-Z>] [B<-o> I<filename>] [B<-s> I<style>] [B<-t> I<title>] I<xml_file>
 
 =head1 OPTIONS
 
@@ -74,6 +74,10 @@ Suppress multi comments, preserve the last.
 =item -o
 
 Specify the HTML filename to create.
+
+=item -s
+
+Generate an external I<style>.css file.
 
 =item -t
 
@@ -106,11 +110,6 @@ All entity references inside attribute values are expanded.
 This tool needs XML::Parser::PerlSAX (libxml-perl) and XML::Parser modules.
 
 XML::Parser::PerlSAX v0.07 needs to be patched (PerlSAX.patch).
-
-=head1 BUGS & PROBLEMS
-
-XML names are case sensitive, when the file system isn't, there are trouble and confusion
-in book mode (an example is HTML entities on Windows).
 
 =head1 SEE ALSO
 

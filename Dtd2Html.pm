@@ -25,7 +25,7 @@ use strict;
 
 use vars qw($VERSION);
 
-$VERSION="0.12";
+$VERSION="0.13";
 
 sub new {
 	my $proto = shift;
@@ -73,7 +73,7 @@ sub unparsed_entity_decl {
 	my ($decl) = @_;
 	my $name = $decl->{Name};
 	warn "unparsed entity $name.\n";
-	warn "Please patch XML::Parser::PerlSAX v0.07 (see the embedded pod or the readme).\n";
+#	warn "Please patch XML::Parser::PerlSAX v0.07 (see the embedded pod or the readme).\n";
 }
 
 sub entity_decl {
@@ -128,8 +128,8 @@ sub doctype_decl {
 	}
 	$self->{doc}->{doctype_decl} = $decl;
 	$self->{doc}->{root_name} = $decl->{Name};
-	die "Please patch XML::Parser::PerlSAX v0.07 (see the embedded pod or the readme).\n"
-			if (exists $decl->{SystemId});
+#	die "Please patch XML::Parser::PerlSAX v0.07 (see the embedded pod or the readme).\n"
+#			if (exists $decl->{SystemId});
 }
 
 sub xml_decl {
@@ -140,6 +140,11 @@ sub xml_decl {
 ###############################################################################
 
 package XML::Handler::Dtd2Html::Document;
+
+sub version {
+	my $self = shift;
+	return $XML::Handler::Dtd2Html::VERSION;
+}
 
 sub _cross_ref {
 	my $self = shift;
@@ -208,7 +213,7 @@ sub _cross_ref {
 
 sub _format_head {
 	my $self = shift;
-	my($FH, $title) = @_;
+	my($FH, $title, $style) = @_;
 	my $now = localtime();
 	print $FH "<?xml version='1.0' encoding='ISO-8859-1'?>\n";
 	print $FH "<!DOCTYPE html PUBLIC '-//W3C//DTD XHTML 1.0 Strict//EN' 'xhtml1-strict.dtd'>\n";
@@ -216,18 +221,16 @@ sub _format_head {
 	print $FH "\n";
 	print $FH "  <head>\n";
 	print $FH "    <meta http-equiv='Content-Type' content='text/html; charset=ISO-8859-1' />\n";
-	print $FH "    <meta name='generator' content='dtd2html (Perl)' />\n";
+	print $FH "    <meta name='generator' content='dtd2html ",$self->version()," (Perl ",$],")' />\n";
 	print $FH "    <meta name='date' content='",$now,"' />\n";
 	print $FH "    <title>",$title,"</title>\n";
-	print $FH "    <style type='text/css'>\n";
-	print $FH "      a.index {font-weight: bold}\n";
-	print $FH "      hr {text-align: center}\n";
-	print $FH "      h2 {color: red}\n";
-	print $FH "      p.comment {color: green}\n";
-	print $FH "      span.comment {color: green}\n";
-	print $FH "      span.keyword1 {color: teal}\n";
-	print $FH "      span.keyword2 {color: maroon}\n";
-	print $FH "    </style>\n";
+	if ($self->{css}) {
+		print $FH "    <link href='",$self->{css},".css' rel='stylesheet' type='text/css'/>\n";
+	} else {
+		print $FH "    <style type='text/css'>\n";
+		print $FH $style;
+		print $FH "    </style>\n";
+	}
 	print $FH "  </head>\n";
 	print $FH "\n";
 }
@@ -592,22 +595,46 @@ sub generateMain {
 	print $FH "</ul>\n";
 }
 
+sub GenerateCSS {
+	my $self = shift;
+	my ($outfile, $style) = @_;
+
+	$outfile =~ s/(\/[^\/]+)$//;
+	$outfile .= "/" . $self->{css}; 
+
+	open OUT, "> $outfile.css"
+			or die "can't open $outfile.css ($!)\n";
+	print OUT $style;
+	close OUT;
+}
+
 sub generateHTML {
 	my $self = shift;
-	my ($outfile, $title, $flag_comment, $flag_multi, $flag_zombi) = @_;
+	my ($outfile, $title, $css, $flag_comment, $flag_multi, $flag_zombi) = @_;
 
 	$title = "DTD " . $self->{root_name}
 			unless (defined $title);
 
 	$self->_cross_ref($flag_zombi, $flag_multi);
 
+	$self->{css} = $css;
 	$self->{filebase} = $outfile;
 	$self->{filebase} =~ s/^([^\/]+\/)+//;
 	$self->{flag_comment} = $flag_comment;
 
+	my $style = "      a.index {font-weight: bold}\n" .
+	            "      hr {text-align: center}\n" .
+	            "      h2 {color: red}\n" .
+	            "      p.comment {color: green}\n" .
+	            "      span.comment {color: green}\n" .
+	            "      span.keyword1 {color: teal}\n" .
+	            "      span.keyword2 {color: maroon}\n";
+
+	$self->GenerateCSS($outfile,$style) if ($self->{css});
+
 	open OUT, "> $outfile.html"
 			or die "can't open $outfile.html ($!)\n";
-	$self->_format_head(\*OUT, $title);
+	$self->_format_head(\*OUT, $title, $style);
 	print OUT "  <body>\n";
 	print OUT "    <h1>",$title,"</h1>\n";
 	print OUT "    <hr />\n";
@@ -645,7 +672,7 @@ sub _format_head {
 	print $FH "\n";
 	print $FH "  <head>\n";
 	print $FH "    <meta http-equiv='Content-Type' content='text/html; charset=ISO-8859-1' />\n";
-	print $FH "    <meta name='generator' content='dtd2html (Perl)' />\n";
+	print $FH "    <meta name='generator' content='dtd2html ",$self->version()," (Perl ",$],")' />\n";
 	print $FH "    <meta name='date' content='",$now,"' />\n";
 	print $FH "    <title>",$title,"</title>\n";
 	print $FH "  </head>\n";
@@ -661,16 +688,27 @@ sub _mk_index_anchor {
 
 sub generateHTML {
 	my $self = shift;
-	my ($outfile, $title, $flag_comment, $flag_multi, $flag_zombi) = @_;
+	my ($outfile, $title, $css, $flag_comment, $flag_multi, $flag_zombi) = @_;
 
 	$title = "DTD " . $self->{root_name}
 			unless (defined $title);
 
 	$self->_cross_ref($flag_zombi, $flag_multi);
 
+	$self->{css} = $css;
 	$self->{filebase} = $outfile;
 	$self->{filebase} =~ s/^([^\/]+\/)+//;
 	$self->{flag_comment} = $flag_comment;
+
+	my $style = "      a.index {font-weight: bold}\n" .
+	            "      hr {text-align: center}\n" .
+	            "      h2 {color: red}\n" .
+	            "      p.comment {color: green}\n" .
+	            "      span.comment {color: green}\n" .
+	            "      span.keyword1 {color: teal}\n" .
+	            "      span.keyword2 {color: maroon}\n";
+
+	$self->GenerateCSS($outfile,$style) if ($self->{css});
 
 	open OUT, "> $outfile.html"
 			or die "can't open $outfile.html ($!)\n";
@@ -693,7 +731,7 @@ sub generateHTML {
 
 	open OUT, "> $outfile.alpha.html"
 			or die "can't open $outfile.alpha.html ($!)\n";
-	$self->SUPER::_format_head(\*OUT, $title . " (Index)");
+	$self->SUPER::_format_head(\*OUT, $title . " (Index)", $style);
 	print OUT "  <body>\n";
 	$self->generateAlphaElement(\*OUT);
 	$self->generateAlphaEntity(\*OUT);
@@ -704,7 +742,7 @@ sub generateHTML {
 
 	open OUT, "> $outfile.tree.html"
 			or die "can't open $outfile.tree.html ($!)\n";
-	$self->SUPER::_format_head(\*OUT, $title . " (Tree)");
+	$self->SUPER::_format_head(\*OUT, $title . " (Tree)", $style);
 	print OUT "  <body>\n";
 	$self->generateTree(\*OUT);
 	print OUT "  </body>\n";
@@ -713,7 +751,7 @@ sub generateHTML {
 
 	open OUT, "> $outfile.main.html"
 			or die "can't open $outfile.main.html ($!)\n";
-	$self->SUPER::_format_head(\*OUT, $title . " (Main)");
+	$self->SUPER::_format_head(\*OUT, $title . " (Main)", $style);
 	print OUT "  <body>\n";
 	print OUT "    <h1>",$title,"</h1>\n";
 	print OUT "    <hr />\n";
@@ -733,7 +771,7 @@ package XML::Handler::Dtd2Html::DocumentBook;
 
 sub _format_head {
 	my $self = shift;
-	my($FH, $title, $links) = @_;
+	my($FH, $title, $style, $links) = @_;
 	my $now = localtime();
 	print $FH "<?xml version='1.0' encoding='ISO-8859-1'?>\n";
 	print $FH "<!DOCTYPE html PUBLIC '-//W3C//DTD XHTML 1.0 Strict//EN' 'xhtml1-strict.dtd'>\n";
@@ -743,15 +781,16 @@ sub _format_head {
 	print $FH "    <meta http-equiv='Content-Type' content='text/html; charset=ISO-8859-1' />\n";
 	print $FH $links
 			if (defined $links);
-	print $FH "    <meta name='generator' content='dtd2html (Perl)' />\n";
+	print $FH "    <meta name='generator' content='dtd2html ",$self->version()," (Perl ",$],")' />\n";
 	print $FH "    <meta name='date' content='",$now,"' />\n";
 	print $FH "    <title>",$title,"</title>\n";
-	print $FH "    <style type='text/css'>\n";
-	print $FH "      a.index {font-weight: bold}\n";
-	print $FH "      hr {text-align: center}\n";
-	print $FH "      table.synopsys {background-color: #DCDCDC}\n";	# gainsboro
-	print $FH "      td.title {font-style: italic}\n";
-	print $FH "    </style>\n";
+	if ($self->{css}) {
+		print $FH "    <link href='",$self->{css},".css' rel='stylesheet' type='text/css'/>\n";
+	} else {
+		print $FH "    <style type='text/css'>\n";
+		print $FH $style;
+		print $FH "    </style>\n";
+	}
 	print $FH "  </head>\n";
 	print $FH "\n";
 }
@@ -761,6 +800,7 @@ sub _mk_model_anchor {
 	my($name) = @_;
 	my $uri_name = $name;
 	$uri_name =~ s/:/_/g;
+	$uri_name = $self->_mk_filename($uri_name);
 
 	return "<a href='" . $self->{filebase} . ".elt." . $uri_name . ".html'>" . $name . "</a>",
 }
@@ -770,6 +810,7 @@ sub _mk_text_anchor {
 	my($type, $name) = @_;
 	my $uri_name = $name;
 	$uri_name =~ s/:/_/g;
+	$uri_name = $self->_mk_filename($uri_name);
 
 	return "<a href='" . $self->{filebase} . "." . $type . "." . $uri_name . ".html'>" . $name . "</a>";
 }
@@ -780,10 +821,11 @@ sub _mk_nav_anchor {
 
 	return "&nbsp;" unless ($name);
 
-	my $uri = $name;
-	$uri =~ s/[ :]/_/g;
+	my $uri_name = $name;
+	$uri_name =~ s/[ :]/_/g;
+	$uri_name = $self->_mk_filename($uri_name);
 
-	return "<a href='" . $self->{filebase} . "." . $type . "." . $uri . ".html' accesskey='" . $accesskey . "'>" . $label . "</a>";
+	return "<a href='" . $self->{filebase} . "." . $type . "." . $uri_name . ".html' accesskey='" . $accesskey . "'>" . $label . "</a>";
 }
 
 sub generatePageHeader {
@@ -978,20 +1020,28 @@ sub generatePage {
 	}
 	print $FH "<!-- HERE, insert extra data -->\n";
 	if ($type eq "element") {
-		if (scalar @{$decl->{uses}} != 0) {
+		if (scalar keys %{$decl->{used_by}} != 0) {
 			print $FH "<h3>Parents</h3>\n";
-			print $FH "  <p>These elements contain configure: ";
-			foreach (sort @{$decl->{uses}}) {
-				print $FH $self->_mk_model_anchor($_),", ";
+			print $FH "  <p>These elements contain ",$name,": ";
+			my $first = 1;
+			foreach (sort keys %{$decl->{used_by}}) {
+				print $FH ", " unless ($first);
+				print $FH $self->_mk_model_anchor($_);
+				$first = 0;
 			}
+			print $FH ".";
 			print $FH "  </p>\n";
 		}
-		if (scalar keys %{$decl->{used_by}} != 0) {
+		if (scalar @{$decl->{uses}} != 0) {
 			print $FH "<h3>Children</h3>\n";
-			print $FH "  <p>The following elements occur in configure: ";
-			foreach (sort keys %{$decl->{used_by}}) {
-				print $FH $self->_mk_model_anchor($_),", ";
+			print $FH "  <p>The following elements occur in ",$name,": ";
+			my $first = 1;
+			foreach (sort @{$decl->{uses}}) {
+				print $FH ", " unless ($first);
+				print $FH $self->_mk_model_anchor($_);
+				$first = 0;
 			}
+			print $FH ".";
 			print $FH "  </p>\n";
 		} else {
 			print $FH "  <p />\n";
@@ -1003,20 +1053,22 @@ sub _mk_index_anchor {
 	my $self = shift;
 	my($type, $name) = @_;
 
-	my $uri = $name;
-	$uri =~ s/[:]/_/g;
+	my $uri_name = $name;
+	$uri_name =~ s/[:]/_/g;
+	$uri_name = $self->_mk_filename($uri_name);
 
-	return "<a class='index' href='" . $self->{filebase} . "." . $type . "." . $uri . ".html'>" . $name ."</a>";
+	return "<a class='index' href='" . $self->{filebase} . "." . $type . "." . $uri_name . ".html'>" . $name ."</a>";
 }
 
 sub _mk_outfile {
 	my $self = shift;
 	my($outfile, $type, $name) = @_;
 
-	my $uri = $name;
-	$uri =~ s/[ :]/_/g;
+	my $uri_name = $name;
+	$uri_name =~ s/[ :]/_/g;
+	$uri_name = $self->_mk_filename($uri_name);
 
-	return $outfile . "." . $type . "." . $uri . ".html";
+	return $outfile . "." . $type . "." . $uri_name . ".html";
 }
 
 sub _mk_link {
@@ -1025,35 +1077,67 @@ sub _mk_link {
 
 	return "" unless ($name);
 
-	my $uri = $name;
-	$uri =~ s/[ :]/_/g;
+	my $uri_name = $name;
+	$uri_name =~ s/[ :]/_/g;
+	$uri_name = $self->_mk_filename($uri_name);
 
-	return "<link rel='" . $rel . "' title='" . $title . "' href='" . $self->{filebase} . "." . $type . "." . $uri . ".html'/>\n";
+	return "<link rel='" . $rel . "' title='" . $title . "' href='" . $self->{filebase} . "." . $type . "." . $uri_name . ".html'/>\n";
+}
+
+sub _test_sensitive {
+	my $self = shift;
+	use File::Temp qw(tempfile);
+
+	my ($fh, $filename) = tempfile("caseXXXX");
+	close $fh;
+	if (-e $filename and -e uc $filename) {
+		$self->{not_sensitive} = 1;
+	}
+	unlink $filename;
+}
+
+sub _mk_filename {
+	my $self = shift;
+	my ($name) = @_;
+	return $name unless (exists $self->{not_sensitive});
+	$name =~ s/([A-Z])/$1_/g;  
+	$name =~ s/([a-z])/_$1/g;
+	return $name;  
 }
 
 sub generateHTML {
 	my $self = shift;
-	my ($outfile, $title, $flag_comment, $flag_multi, $flag_zombi) = @_;
+	my ($outfile, $title, $css, $flag_comment, $flag_multi, $flag_zombi) = @_;
 	my $links;
 
 	$title = "DTD " . $self->{root_name}
 			unless (defined $title);
 
+	$self->_test_sensitive();
+
 	$self->_cross_ref($flag_zombi, $flag_multi);
 
+	$self->{css} = $css;
 	$self->{filebase} = $outfile;
 	$self->{filebase} =~ s/^([^\/]+\/)+//;
 	$self->{flag_comment} = $flag_comment;
 
+	my $style = "      a.index {font-weight: bold}\n" .
+	            "      hr {text-align: center}\n" . 
+	            "      table.synopsys {background-color: #DCDCDC}\n" .	# gainsboro
+	            "      td.title {font-style: italic}\n";
+
+	$self->GenerateCSS($outfile,$style) if ($self->{css});
+
 	my $filename = $self->_mk_outfile($outfile,"book","home");
 	open OUT, "> $filename"
 			or die "can't open $filename ($!)\n";
-	$self->_format_head(\*OUT, $title);
+	$self->_format_head(\*OUT, $title, $style);
 	print OUT "  <body>\n";
 	$self->generatePageHeader(\*OUT, $title, "", "", "", "");
-	print OUT "<h2><a href='",$self->{filebase},".book.elements_index.html'>Elements index.</a></h2>\n";
-	print OUT "<h2><a href='",$self->{filebase},".book.entities_index.html'>Entities index.</a></h2>\n";
-	print OUT "<h2><a href='",$self->{filebase},".book.notations_index.html'>Notations index.</a></h2>\n";
+	print OUT "<h2><a href='",$self->{filebase},".book.",$self->_mk_filename("elements_index"),".html'>Elements index.</a></h2>\n";
+	print OUT "<h2><a href='",$self->{filebase},".book.",$self->_mk_filename("entities_index"),".html'>Entities index.</a></h2>\n";
+	print OUT "<h2><a href='",$self->{filebase},".book.",$self->_mk_filename("notations_index"),".html'>Notations index.</a></h2>\n";
 	$self->generateTree(\*OUT);
 	$self->generatePageFooter(\*OUT, "", "", "", "", "");
 	print OUT "  </body>\n";
@@ -1065,7 +1149,7 @@ sub generateHTML {
 	$links .= $self->_mk_link("Next", "Entities index.", "book", "entities index");
 	open OUT, "> $filename"
 			or die "can't open $filename ($!)\n";
-	$self->_format_head(\*OUT, "Elements Index.", $links);
+	$self->_format_head(\*OUT, "Elements Index.", $style, $links);
 	print OUT "  <body>\n";
 	$self->generatePageHeader(\*OUT, $title, "book", "home", "book", "entities index");
 	$self->generateAlphaElement(\*OUT, 1);
@@ -1098,7 +1182,7 @@ sub generateHTML {
 			$links .= $self->_mk_link("Next", "Element " . $next, $type_n, $next);
 			open OUT, "> $filename"
 					or die "can't open $filename ($!)\n";
-			$self->_format_head(\*OUT, "Element " . $_, $links);
+			$self->_format_head(\*OUT, "Element " . $_, $style, $links);
 			print OUT "  <body>\n";
 			$self->generatePageHeader(\*OUT, $title, $type_p, $prev, $type_n, $next);
 			$self->generatePage(\*OUT, $decl);
@@ -1115,7 +1199,7 @@ sub generateHTML {
 	$links .= $self->_mk_link("Next", "Notations index.", "book", "notations index");
 	open OUT, "> $filename"
 			or die "can't open $filename ($!)\n";
-	$self->_format_head(\*OUT, "Entities Index.", $links);
+	$self->_format_head(\*OUT, "Entities Index.", $style, $links);
 	print OUT "  <body>\n";
 	$self->generatePageHeader(\*OUT, $title, "book", "elements index", "book", "notations index");
 	$self->generateAlphaEntity(\*OUT, 1);
@@ -1148,7 +1232,7 @@ sub generateHTML {
 			$links .= $self->_mk_link("Next", "Entity " . $next, $type_n, $next);
 			open OUT, "> $filename"
 					or die "can't open $filename ($!)\n";
-			$self->_format_head(\*OUT, "Entity " . $_, $links);
+			$self->_format_head(\*OUT, "Entity " . $_, $style, $links);
 			print OUT "  <body>\n";
 			$self->generatePageHeader(\*OUT, $title, $type_p, $prev, $type_n, $next);
 			$self->generatePage(\*OUT, $decl);
@@ -1164,7 +1248,7 @@ sub generateHTML {
 	$links = $self->_mk_link("Prev", "Entities index.", "book", "entities index");
 	open OUT, "> $filename"
 			or die "can't open $filename ($!)\n";
-	$self->_format_head(\*OUT, "Notations Index.", $links);
+	$self->_format_head(\*OUT, "Notations Index.", $style, $links);
 	print OUT "  <body>\n";
 	$self->generatePageHeader(\*OUT, $title, "book", "entities index", "", "");
 	$self->generateAlphaNotation(\*OUT, 1);
@@ -1197,7 +1281,7 @@ sub generateHTML {
 			$links .= $self->_mk_link("Next", "Notation " . $next, $type_n, $next);
 			open OUT, "> $filename"
 					or die "can't open $filename ($!)\n";
-			$self->_format_head(\*OUT, "Notation " . $_, $links);
+			$self->_format_head(\*OUT, "Notation " . $_, $style, $links);
 			print OUT "  <body>\n";
 			$self->generatePageHeader(\*OUT, $title, $type_p, $prev, $type_n, $next);
 			$self->generatePage(\*OUT, $decl);

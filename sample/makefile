@@ -1,4 +1,4 @@
 
 all:
-	dtd2html -t "Perl Package Distribution" -o ppd sample.ppd
+	dtd2html.pl -t "Perl Package Distribution" -o ppd sample.ppd
 
