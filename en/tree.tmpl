@@ -21,7 +21,12 @@
   </head>
 
   <body>
-    <!-- TMPL_INCLUDE NAME='_index.tmpl' -->
+    <h2>Element tree.</h2>
+    <!-- TMPL_IF NAME=tree -->
+      <!-- TMPL_VAR NAME=tree -->
+    <!-- TMPL_ELSE -->
+      NOT AVAILABLE.
+    <!-- /TMPL_IF -->
   </body>
 
 </html>

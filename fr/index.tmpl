@@ -11,7 +11,7 @@
 <!-- TMPL_IF NAME="lst_ex" -->
   <h2>Liste des exemples.</h2>
 <!-- /TMPL_IF -->
-<dl>
+<blockquote><dl>
 <!-- TMPL_IF NAME=nb -->
   <!-- TMPL_LOOP NAME="a_link" -->
   <dt><!-- TMPL_VAR NAME="a" --></dt>
@@ -19,6 +19,6 @@
 <!-- TMPL_ELSE -->
   <dt>AUCUN</dt>
 <!-- /TMPL_IF -->
-</dl>
+</dl></blockquote>
 <!-- TMPL_INCLUDE NAME='_footer.tmpl' -->
 

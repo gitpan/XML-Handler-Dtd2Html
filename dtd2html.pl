@@ -11,9 +11,6 @@ use XML::Handler::Dtd2Html;
 my %opts;
 getopts('bCdfHMl:p:s:t:o:x:Z', \%opts);
 
-die "incoherent version between dtd2html.pl and Dtd2Hmtl.pm\n"
-		unless ($XML::Handler::Dtd2Html::VERSION eq "0.32");
-
 my $file = $ARGV[0];
 die "No input file\n"
 		unless (defined $file);
@@ -213,11 +210,11 @@ So, you must use entities &lt; &gt; &amp; within a comment.
 B<dtd2html> parses tags that are recognized when they are embedded
 within an XML comment. These doc tags enable you to autogenerate a
 complete, well-formatted document from your XML source. The tags start with
-an @. The tags with two @ forces href generation.
+an @. A tag with two @ forces a link generation if the option -H is set.
 
 Tags must start at the beginning of a line.
 
-The special tag @BRIEF puts doc in 'Name' section (in book mode).
+The special tag @BRIEF puts its value in 'Name' section (in book mode).
 
 The special tag @INCLUDE allows inclusion of the content of an external file.
 
@@ -230,14 +227,21 @@ The special tag @INCLUDE allows inclusion of the content of an external file.
 
 The special tag @HIDDEN don't put the data in the documentation.
 
-The special tag @TITLE before <!DOCTYPE> have the same effect as the option -t.
+The special tag @TITLE before <!DOCTYPE> has the same effect as the option -t.
 
-The special tag are case insensitive.
+The special tag @SAMPLE allows inclusion of a XML fragment from an external file.
+
+ <!--
+   comments
+   @SAMPLE ex2 : ex2.xml
+ -->
+
+The special tags are case insensitive.
 
 =head2 HTML Templates
 
 Since version 0.30, HTML design and Perl programming are decoupling.
-And a language switch option is providing.
+And a language switch option is available.
 
 So, translation of the templates are welcome.
 

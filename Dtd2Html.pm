@@ -25,7 +25,7 @@ use strict;
 
 use vars qw($VERSION);
 
-$VERSION="0.32";
+$VERSION="0.33";
 
 sub new {
 	my $proto = shift;
@@ -167,6 +167,7 @@ sub comment {
 package XML::Handler::Dtd2Html::Document;
 
 use HTML::Template;
+use File::Basename;
 
 sub _process_args {
 	my $self = shift;
@@ -192,6 +193,7 @@ sub _process_args {
 
 	$self->{css} = $hash{css};
 	$self->{examples} = $hash{examples};
+	$self->{dirname} = dirname($hash{outfile});
 	$self->{filebase} = $hash{outfile};
 	$self->{filebase} =~ s/^([^\/]+\/)+//;
 	$self->{flag_comment} = $hash{flag_comment};
@@ -287,20 +289,26 @@ sub _format_content_model {
 					and $str .= $1,
 					    last;
 
-			s/^([\?\*\+\(\),\|])//
+			s/^([\?\*\+\)])//
 					and $str .= $1,
 					    last;
+			s/^([\(,])//
+					and $str .= $1 . " ",
+					    last;
+			s/^(\|)//
+					and $str .= " " . $1 . " ",
+					    last;
 			s/^(EMPTY)//
-					and $str .= "<span class='keyword1'>" . $1 . "</span>",
+					and $str .= "<span class='keyword1'>" . $1 . "</span> ",
 					    last;
 			s/^(ANY)//
-					and $str .= "<span class='keyword1'>" . $1 . "</span>",
+					and $str .= "<span class='keyword1'>" . $1 . "</span> ",
 					    last;
 			s/^(#PCDATA)//
-					and $str .= "<span class='keyword1'>" . $1 . "</span>",
+					and $str .= "<span class='keyword1'>" . $1 . "</span> ",
 					    last;
 			s/^([A-Za-z_:][0-9A-Za-z\.\-_:]*)//
-					and $str .= $self->_mk_text_anchor("elt", $1),
+					and $str .= $self->_mk_text_anchor("elt", $1) . " ",
 					    last;
 			s/^([\S]+)//
 					and warn __PACKAGE__,":_format_content_model INTERNAL_ERROR $1\n",
@@ -427,7 +435,7 @@ sub _mk_index_href {
 
 sub generateAlphaElement {
 	my $self = shift;
-	my ($nb, $a_link) = @_;
+	my ($nb, $a_link, $flg_brief) = @_;
 
 	$nb = 'nb_element' unless (defined $nb);
 	$a_link = 'a_elements' unless (defined $a_link);
@@ -436,7 +444,9 @@ sub generateAlphaElement {
 	my @a_link = ();
 	foreach (@elements) {
 		my $a = $self->_mk_index_anchor("elt", $_);
-		$a .= " (root)" if ($_ eq $self->{root_name});
+		$a .= " <em>(root)</em>" if ($_ eq $self->{root_name});
+		my $brief = $self->_get_brief($self->{hash_element}->{$_}) if ($flg_brief);
+		$a .= " - " . $brief if ($brief);
 		push @a_link, { a => $a };
 	}
 	$self->{template}->param(
@@ -447,7 +457,7 @@ sub generateAlphaElement {
 
 sub generateAlphaEntity {
 	my $self = shift;
-	my ($nb, $a_link) = @_;
+	my ($nb, $a_link, $flg_brief) = @_;
 
 	$nb = 'nb_entity' unless (defined $nb);
 	$a_link = 'a_entities' unless (defined $a_link);
@@ -456,6 +466,8 @@ sub generateAlphaEntity {
 	my @a_link = ();
 	foreach (@entities) {
 		my $a = $self->_mk_index_anchor("ent", $_);
+		my $brief = $self->_get_brief($self->{hash_entity}->{$_}) if ($flg_brief);
+		$a .= " - " . $brief if ($brief);
 		push @a_link, { a => $a };
 	}
 	$self->{template}->param(
@@ -466,7 +478,7 @@ sub generateAlphaEntity {
 
 sub generateAlphaNotation {
 	my $self = shift;
-	my ($nb, $a_link) = @_;
+	my ($nb, $a_link, $flg_brief) = @_;
 
 	$nb = 'nb_notation' unless (defined $nb);
 	$a_link = 'a_notations' unless (defined $a_link);
@@ -475,6 +487,8 @@ sub generateAlphaNotation {
 	my @a_link = ();
 	foreach (@notations) {
 		my $a = $self->_mk_index_anchor("not", $_);
+		my $brief = $self->_get_brief($self->{hash_notation}->{$_}) if ($flg_brief);
+		$a .= " - " . $brief if ($brief);
 		push @a_link, { a => $a };
 	}
 	$self->{template}->param(
@@ -504,7 +518,7 @@ sub generateExampleIndex {
 
 sub _mk_tree {
 	my $self = shift;
-	my ($name) = @_;
+	my ($name,$depth) = @_;
 	my %done = ();
 
 	return if ($self->{hash_element}->{$name}->{done});
@@ -513,13 +527,14 @@ sub _mk_tree {
 			unless (defined $self->{hash_element}->{$name}->{uses});
 	return unless (scalar keys %{$self->{hash_element}->{$name}->{uses}});
 
+	$self->{_tree_depth} = $depth if ($depth > $self->{_tree_depth});
 	$self->{_tree} .= "<ul class='tree'>\n";
 	foreach (keys %{$self->{hash_element}->{$name}->{uses}}) {
 		next if ($_ eq $name);
 		next if (exists $done{$_});
 		$done{$_} = 1;
 		$self->{_tree} .= "  <li class='tree'>" . $self->_mk_index_anchor("elt",$_) . "\n";
-		$self->_mk_tree($_);
+		$self->_mk_tree($_,$depth+1);
 		$self->{_tree} .= "  </li>\n";
 	}
 	$self->{_tree} .= "</ul>\n";
@@ -528,15 +543,17 @@ sub _mk_tree {
 sub generateTree {
 	my $self = shift;
 
+	$self->{_tree_depth} = 1;
 	$self->{_tree} = "<ul class='tree'>\n";
 	$self->{_tree} .= "  <li class='tree'>" . $self->_mk_index_anchor("elt", $self->{root_name}) . "\n";
 	if (exists $self->{hash_element}->{$self->{root_name}}) {
-		$self->_mk_tree($self->{root_name});
+		$self->_mk_tree($self->{root_name},$self->{_tree_depth});
 	} else {
 		warn "$self->{root_name} declared in DOCTYPE is an unknown element.\n";
 	}
 	$self->{_tree} .= "  </li>\n";
 	$self->{_tree} .= "</ul>\n";
+	$self->{_tree} = "" if ($self->{_tree_depth} > 7);
 	$self->{template}->param(
 			tree		=> $self->{_tree},
 	);
@@ -562,11 +579,20 @@ sub _get_doc {
 				unless (   uc($entry) eq "BRIEF"
 						or uc($entry) eq "HIDDEN"
 						or (uc($entry) eq "TITLE" and $decl->{type} eq "doctype") ) {
-					$data = $self->_process_text($data, $name, $href);
-					push @tag, {
-							entry	=> $entry,
-							data	=> $data,
-					};
+					if ($entry =~ /^SAMPLE($|\s)/i) {
+						$entry =~ s/^SAMPLE\s*//i;
+						$data = "<pre>" . $self->_mk_example($data) . "</pre>";
+						push @tag, {
+								entry	=> $entry,
+								data	=> $data,
+						};
+					} else {
+						$data = $self->_process_text($data, $name, $href);
+						push @tag, {
+								entry	=> $entry,
+								data	=> $data,
+						};
+					}
 				}
 			}
 		}
@@ -595,11 +621,20 @@ sub _get_doc_attrs {
 						my ($href, $entry, $data) = @{$_};
 						unless (   uc($entry) eq "BRIEF"
 								or uc($entry) eq "HIDDEN" ) {
-							$data = $self->_process_text($data, $name, $href);
-							push @tag, {
-									entry	=> $entry,
-									data	=> $data,
-							};
+							if ($entry =~ /^SAMPLE($|\s)/i) {
+								$entry =~ s/^SAMPLE\s*//i;
+								$data = "<pre>" . $self->_mk_example($data) . "</pre>";
+								push @tag, {
+										entry	=> $entry,
+										data	=> $data,
+								};
+							} else {
+								$data = $self->_process_text($data, $name, $href);
+								push @tag, {
+										entry	=> $entry,
+										data	=> $data,
+								};
+							}
 						}
 					}
 				}
@@ -715,13 +750,20 @@ sub generateMain {
 					                   || $type eq "ENTITIES"
 					                   || $type eq "NMTOKEN"
 					                   || $type eq "NMTOKENS";
+					unless ($tokenized_type) {
+						$type =~ s/\(/\( /;
+						$type =~ s/\)/ \)/;
+						$type =~ s/\|/ \| /g;
+					}
+					my $value = $attr->{Value};
+					$value = "\"$attr->{Value}\"" if ($value);
 					push @attrs, {
 							name				=> $name,
 							attr_name			=> $attr->{aName},
 							type				=> $type,
 							tokenized_type		=> $tokenized_type,
 							value_default		=> $attr->{ValueDefault},
-							value				=> $attr->{Value},
+							value				=> $value,
 					};
 				}
 			}
@@ -825,12 +867,10 @@ sub generateCSS {
 	my $self = shift;
 	my ($style) = @_;
 
-	my $outfile = $self->{outfile};
-	$outfile =~ s/(\/[^\/]+)$//;
-	$outfile .= "/" . $self->{css};
+	my $outfile = $self->{dirname} . "/" . $self->{css} . ".css";
 
-	open OUT, "> $outfile.css"
-			or die "can't open $outfile.css ($!)\n";
+	open OUT, "> $outfile"
+			or die "can't open $outfile ($!)\n";
 	print OUT $style;
 	close OUT;
 }
@@ -946,7 +986,14 @@ sub GenerateHTML {
 	print OUT $self->{template}->output();
 	close OUT;
 
-	$self->{template}->clear_params();
+	$template = "tree.tmpl";
+	$self->{template} = new HTML::Template(
+			filename	=> $template,
+			path		=> $self->{path_tmpl},
+	);
+	die "can't create template with $template ($!).\n"
+			unless (defined $self->{template});
+
 	$self->{template}->param(
 			generator	=> $self->{generator},
 			date		=> $self->{now},
@@ -1042,17 +1089,36 @@ sub _get_attributes {
 	my @attrs = ();
 	if (exists $self->{hash_attr}->{$name}) {
 		foreach my $attr (@{$self->{hash_attr}->{$name}}) {
+			my $type = $attr->{Type};
+			if (        $type ne "CDATA"
+					and $type ne "ID"
+					and $type ne "IDREF"
+					and $type ne "IDREFS"
+					and $type ne "ENTITY"
+					and $type ne "ENTITIES"
+					and $type ne "NMTOKEN"
+					and $type ne "NMTOKENS" ) {
+				if ($type =~ /^NOTATION/) {
+					$type =~ s/^NOTATION\s*\(//;
+					$type =~ s/\)$//;
+					$type =~ s/\|/<br \/>/g;
+					$type = "<em>Enumerated notation:</em><br />" . $type;
+				} else {
+					$type =~ s/^\(//;
+					$type =~ s/\)$//;
+					$type =~ s/\|/<br \/>/g;
+					$type = "<em>Enumeration:</em><br />" . $type;
+				}
+			}
 			my $value_default = $attr->{ValueDefault};
 			my $value = $attr->{Value};
 			if ($value) {
-				$value =~ s/^['"]//;
-				$value =~ s/['"]$//;
-				$value_default .= " " . $value;
+				$value_default .= " \"" . $value . "\"";
 			}
 			$value_default = "&nbsp;" unless ($value_default);
 			push @attrs, {
 					attr_name	=> $attr->{aName},
-					type		=> $attr->{Type},
+					type		=> $type,
 					value_default	=> $value_default,
 			};
 		}
@@ -1118,16 +1184,16 @@ sub copyPNG {
 	use File::Copy;
 
 	my $path = ${$self->{path_tmpl}}[-1];
-	my $outfile = $self->{outfile};
-	$outfile =~ s/(\/[^\/]+)+$//;
 	foreach my $img qw(next up home prev) {
-		unless ( -e "$path/$img.png") {
-			warn "can't find $path/$img.png.\n";
+		my $infile = $path . "/" . $img .".png";
+		my $outfile = $self->{dirname} . "/" . $img . ".png";
+		unless ( -e $infile) {
+			warn "can't find $infile.\n";
 			next;
 		}
-		copy("$path/$img.png", "$outfile/$img.png");
-		unless ( -e "$outfile/$img.png") {
-			warn "$outfile/$img.png is not copied.\n";
+		copy($infile, $outfile);
+		unless ( -e $outfile) {
+			warn "$outfile is not copied.\n";
 		}
 	}
 }
@@ -1253,7 +1319,7 @@ sub GenerateHTML {
 			idx_not		=> 0,
 			lst_ex		=> 0,
 	);
-	$self->generateAlphaElement("nb", "a_link");
+	$self->generateAlphaElement("nb", "a_link", 1);
 	my @elements = sort keys %{$self->{hash_element}};
 
 	$filename = $self->_mk_outfile("book", "elements_index");
@@ -1357,7 +1423,7 @@ sub GenerateHTML {
 			lst_ex		=> 0,
 	);
 	my @entities = sort keys %{$self->{hash_entity}};
-	$self->generateAlphaEntity("nb", "a_link");
+	$self->generateAlphaEntity("nb", "a_link", 1);
 
 	$filename = $self->_mk_outfile("book","entities_index");
 	open OUT, "> $filename"
@@ -1454,7 +1520,7 @@ sub GenerateHTML {
 			lst_ex		=> 0,
 	);
 	my @notations = sort keys %{$self->{hash_notation}};
-	$self->generateAlphaNotation("nb", "a_link");
+	$self->generateAlphaNotation("nb", "a_link", 1);
 
 	$filename = $self->_mk_outfile("book", "notations_index");
 	open OUT, "> $filename"
@@ -1650,7 +1716,7 @@ Extensible Markup Language (XML), E<lt>http://www.w3c.org/TR/REC-xmlE<gt>
 
 =head1 COPYRIGHT
 
-(c) 2002 Francois PERRAD, France. All rights reserved.
+(c) 2002-2003 Francois PERRAD, France. All rights reserved.
 
 This program is distributed under the Artistic License.
 

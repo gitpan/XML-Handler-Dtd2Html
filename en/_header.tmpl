@@ -32,16 +32,16 @@
         <tr>
           <th colspan='3' align='center'><!-- TMPL_VAR NAME=book_title --></th>
         </tr>
-        <tr>
-          <td align='left' valign='bottom'>
+        <tr valign='bottom'>
+          <td align='left'>
             <!-- TMPL_IF NAME=href_prev -->
               <a href='<TMPL_VAR NAME=href_prev>' accesskey='P'><img src='prev.png' alt='Previous' border='0'/></a>
             <!-- TMPL_ELSE -->
               &nbsp;
             <!-- /TMPL_IF -->
           </td>
-          <td align='center' valign='bottom'/>
-          <td align='right' valign='bottom'>
+          <td align='center'>&nbsp;</td>
+          <td align='right'>
             <!-- TMPL_IF NAME=href_next -->
               <a href='<TMPL_VAR NAME=href_next>' accesskey='N'><img src='next.png' alt='Next' border='0'/></a>
             <!-- TMPL_ELSE -->

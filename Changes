@@ -1,5 +1,12 @@
 Revision history for Perl extension XML::Handler::Dtd2Html.
 
+0.33  Mon Aug 25 12:30:00 2003
+	- add special tag : SAMPLE
+	- layout : some improvements
+	- _main.tmpl : no anchor for entity
+	- fix in PNG copy
+	- review of documentation (thank to Richard)
+
 0.32  Tue Jul 22 12:30:00 2003
 	- put style sheets with templates
 	- add special 2 tags : TITLE and HIDDEN
