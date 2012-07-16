@@ -1,6 +1,9 @@
 
 package XML::Handler::Dtd2Html::Document;
 
+use strict;
+use warnings;
+
 use Parse::RecDescent;
 
 sub new {
@@ -47,16 +50,17 @@ EndGrammar
 package XML::Handler::Dtd2Html;
 
 use strict;
+use warnings;
 
 use vars qw($VERSION);
 
-$VERSION="0.41";
+$VERSION="0.42";
 
 sub new {
 	my $proto = shift;
 	my $class = ref($proto) || $proto;
 	my $self = {
-			doc         => new XML::Handler::Dtd2Html::Document(),
+			doc         => XML::Handler::Dtd2Html::Document->new(),
 			comments    => []
 	};
 	bless($self, $class);
@@ -69,6 +73,7 @@ sub start_document {
 	my $self = shift;
 	my ($decl) = @_;
 	$self->{doc}->{xml_decl} = $decl if (%{$decl});
+	return;
 }
 
 sub end_document {
@@ -91,6 +96,7 @@ sub element_decl {
 	my $name = $decl->{Name};
 	$self->{doc}->{hash_element}->{$name} = $decl;
 	push @{$self->{doc}->{list_decl}}, $decl;
+	return;
 }
 
 sub attribute_decl {
@@ -104,6 +110,7 @@ sub attribute_decl {
 	$self->{doc}->{hash_attr}->{$elt_name} = []
 			unless (exists $self->{doc}->{hash_attr}->{$elt_name});
 	push @{$self->{doc}->{hash_attr}->{$elt_name}}, $decl;
+	return;
 }
 
 sub internal_entity_decl {
@@ -119,6 +126,7 @@ sub internal_entity_decl {
 		$self->{doc}->{hash_entity}->{$name} = $decl;
 		push @{$self->{doc}->{list_decl}}, $decl;
 	}
+	return;
 }
 
 sub external_entity_decl {
@@ -134,6 +142,7 @@ sub external_entity_decl {
 		$self->{doc}->{hash_entity}->{$name} = $decl;
 		push @{$self->{doc}->{list_decl}}, $decl;
 	}
+	return;
 }
 
 # DTD Events
@@ -149,6 +158,7 @@ sub notation_decl {
 	my $name = $decl->{Name};
 	$self->{doc}->{hash_notation}->{$name} = $decl;
 	push @{$self->{doc}->{list_decl}}, $decl;
+	return;
 }
 
 sub unparsed_entity_decl {
@@ -156,6 +166,7 @@ sub unparsed_entity_decl {
 	my ($decl) = @_;
 	$self->{comments} = [];
 	warn "unparsed entity $decl->{Name}.\n";
+	return;
 }
 
 # Lexical Events
@@ -170,12 +181,14 @@ sub start_dtd {
 	$dtd->{type} = "doctype";
 	$self->{doc}->{dtd} = $dtd;
 	$self->{doc}->{root_name} = $dtd->{Name};
+	return;
 }
 
 sub comment {
 	my $self = shift;
 	my ($comment) = @_;
 	push @{$self->{comments}}, $comment;
+	return;
 }
 
 # SAX1 Events
@@ -190,6 +203,9 @@ sub comment {
 ###############################################################################
 
 package XML::Handler::Dtd2Html::ContentModelVisitor;
+
+use strict;
+use warnings;
 
 sub new {
 	my $proto = shift;
@@ -210,11 +226,13 @@ sub new {
 sub _inc_tab {
 	my $self = shift;
 	$self->{tab} .= "  ";
+	return;
 }
 
 sub _dec_tab {
 	my $self = shift;
 	$self->{tab} =~ s/  $//;
+	return;
 }
 
 sub _add {
@@ -223,6 +241,7 @@ sub _add {
 	$str = $raw unless (defined $str);
 	$self->{raw} .= $raw;
 	$self->{str} .= $str;
+	return;
 }
 
 sub _add_name {
@@ -233,6 +252,7 @@ sub _add_name {
 			if (length($self->{tab} . $self->{raw} . $raw) > $self->{max});
 	$self->{raw} .= $raw;
 	$self->{str} .= $str;
+	return;
 }
 
 sub _break {
@@ -242,6 +262,7 @@ sub _break {
 		$self->{raw} = "";
 		$self->{str} .= "\n" . $self->{tab};
 	}
+	return;
 }
 
 sub _visit {
@@ -254,6 +275,7 @@ sub _visit {
 	} else {
 		warn "Please implement a function '$func' in '",ref $self,"'.\n";
 	}
+	return;
 }
 
 #		contentspec: 'EMPTY' | 'ANY' | Mixed | children
@@ -268,6 +290,7 @@ sub visit_contentspec {
 	} elsif (exists $node->{children}) {
 		$self->_visit($node->{children});
 	}
+	return;
 }
 
 #		children: ( choice | seq ) ( '?' | '*' | '+' )(?)
@@ -285,6 +308,7 @@ sub visit_children {
 	if (defined $altern2) {
 		$self->_add($altern2->{__VALUE__});				# '?' or '*' or '+'
 	}
+	return;
 }
 
 #		cp: ( Name | choice | seq ) ( '?' | '*' | '+' )(?)
@@ -309,6 +333,7 @@ sub visit_cp  {
 	if (defined $altern2) {
 		$self->_add($altern2->{__VALUE__});				# '?' or '*' or '+'
 	}
+	return;
 }
 
 #		choice: '(' cp ( '|' cp )(s)  ')'
@@ -325,6 +350,7 @@ sub visit_choice {
 	}
 	$self->_dec_tab();
 	$self->_add(" " . $node->{__STRING2__});				# ')'
+	return;
 }
 
 #		seq: '(' cp ( ',' cp )(s?) ')'
@@ -341,6 +367,7 @@ sub visit_seq {
 	}
 	$self->_dec_tab();
 	$self->_add(" " . $node->{__STRING2__});				# ')'
+	return;
 }
 
 #		Mixed: '(' '#PCDATA' ( '|' Name )(s?) ')*' | '(' '#PCDATA' ')'
@@ -358,6 +385,7 @@ sub visit_Mixed {
 	}
 	$self->_dec_tab();
 	$self->_add(" " . $node->{__STRING3__});				# ')*' or ')'
+	return;
 }
 
 #		Name: /[\w_:][\w\d\.\-_:]*/
@@ -367,11 +395,15 @@ sub visit_Name {
 
 	my $anchor = $self->{doc}->_mk_text_anchor("elt", $node->{__VALUE__});
 	$self->_add_name($node->{__VALUE__}, $anchor);
+	return;
 }
 
 ###############################################################################
 
 package XML::Handler::Dtd2Html::Document;
+
+use strict;
+use warnings;
 
 use HTML::Template;
 use File::Basename;
@@ -437,6 +469,7 @@ sub _process_args {
 			}
 		}
 	}
+	return;
 }
 
 sub _cross_ref {
@@ -485,12 +518,13 @@ sub _cross_ref {
 			}
 		}
 	}
+	return;
 }
 
 sub _format_content_model {
 	my $self = shift;
 	my ($model) = @_;
-	my $visitor = new XML::Handler::Dtd2Html::ContentModelVisitor($self);
+	my $visitor = XML::Handler::Dtd2Html::ContentModelVisitor->new($self);
 	$visitor->_visit($self->{cm_parser}->contentspec($model));
 	my $str = $visitor->{str};
 	return $str;
@@ -501,14 +535,14 @@ sub _include_doc {
 	my($filename) = @_;
 	my $doc = "";
 
-	open IN, $filename
+	open my $IN, '<', $filename
 			or warn "can't open $filename ($!).\n",
 			return $doc;
 
-	while (<IN>) {
+	while (<$IN>) {
 		$doc .= $_;
 	}
-	close IN;
+	close $IN;
 	return $doc;
 }
 
@@ -648,6 +682,7 @@ sub generateAlphaElement {
 			$nb			=> scalar @elements,
 			$a_link		=> \@a_link,
 	);
+	return;
 }
 
 sub generateAlphaEntity {
@@ -678,6 +713,7 @@ sub generateAlphaEntity {
 			$nb			=> scalar @entities,
 			$a_link		=> \@a_link,
 	);
+	return;
 }
 
 sub generateAlphaNotation {
@@ -708,6 +744,7 @@ sub generateAlphaNotation {
 			$nb			=> scalar @notations,
 			$a_link		=> \@a_link,
 	);
+	return;
 }
 
 sub generateExampleIndex {
@@ -729,6 +766,7 @@ sub generateExampleIndex {
 			$nb			=> scalar @examples,
 			$a_link		=> \@a_link,
 	);
+	return;
 }
 
 sub _mk_tree {
@@ -753,6 +791,7 @@ sub _mk_tree {
 		$self->{_tree} .= "  </li>\n";
 	}
 	$self->{_tree} .= "</ul>\n";
+	return;
 }
 
 sub generateTree {
@@ -773,6 +812,7 @@ sub generateTree {
 			tree		=> $self->{_tree},
 	);
 	delete $self->{_tree};
+	return;
 }
 
 sub _get_doc {
@@ -871,14 +911,14 @@ sub _get_style {
 
 	my $style = "";
 	my $path = ${$self->{path_tmpl}}[-1];
-	open IN, "$path/$name"
+	open my $IN, '<', "$path/$name"
 			or warn "can't open $path/$name ($!)",
 			return $style;
 
-	while (<IN>) {
+	while (<$IN>) {
 		$style .= $_;
 	}
-	close IN;
+	close $IN;
 	return $style;
 }
 
@@ -1002,6 +1042,7 @@ sub generateMain {
 	$self->{template}->param(
 			decls		=> \@decls,
 	);
+	return;
 }
 
 sub _process_example {
@@ -1044,11 +1085,11 @@ sub _mk_example {
 	my $self = shift;
 	my ($example, $emphasis) = @_;
 
-	open IN, $example
+	open my $IN, '<', $example
 			or warn "can't open $example ($!)",
 			next;
 	my $data;
-	while (<IN>) {
+	while (<$IN>) {
 		s/&/&amp;/g;
 		s/</&lt;/g;
 		s/>/&gt;/g;
@@ -1058,7 +1099,7 @@ sub _mk_example {
 		s/--&gt;/--&gt;<\/$self->{emphasis}>/g;
 		$data .= $self->_process_example($_);
 	}
-	close IN;
+	close $IN;
 
 	return $data;
 }
@@ -1078,6 +1119,7 @@ sub generateExample {
 			nb_example	=> scalar @{$self->{examples}},
 			examples	=> \@examples,
 	);
+	return;
 }
 
 sub generateCSS {
@@ -1087,11 +1129,12 @@ sub generateCSS {
 	my $outfile = $self->{dirname} . "/" . $self->{css} . ".css";
 
 	unless ( -e $outfile) {
-		open OUT, "> $outfile"
+		open my $OUT, '>', $outfile
 				or die "can't open $outfile ($!)\n";
-		print OUT $style;
-		close OUT;
+		print $OUT $style;
+		close $OUT;
 	}
+	return;
 }
 
 sub GenerateHTML {
@@ -1107,7 +1150,7 @@ sub GenerateHTML {
 	$self->generateCSS($style) if ($self->{css});
 
 	my $template = "simple.tmpl";
-	$self->{template} = new HTML::Template(
+	$self->{template} = HTML::Template->new(
 			filename	=> $template,
 			path		=> $self->{path_tmpl},
 	);
@@ -1128,15 +1171,19 @@ sub GenerateHTML {
 	$self->generateExample();
 
 	my $filename = $self->{outfile} . ".html";
-	open OUT, "> $filename"
+	open my $OUT, '>', $filename
 			or die "can't open $filename ($!)\n";
-	print OUT $self->{template}->output();
-	close OUT;
+	print $OUT $self->{template}->output();
+	close $OUT;
+	return;
 }
 
 ###############################################################################
 
 package XML::Handler::Dtd2Html::DocumentFrame;
+
+use strict;
+use warnings;
 
 use base qw(XML::Handler::Dtd2Html::Document);
 
@@ -1160,7 +1207,7 @@ sub GenerateHTML {
 	$self->generateCSS($style) if ($self->{css});
 
 	my $template = "frame.tmpl";
-	$self->{template} = new HTML::Template(
+	$self->{template} = HTML::Template->new(
 			filename	=> $template,
 			path		=> $self->{path_tmpl},
 	);
@@ -1175,13 +1222,13 @@ sub GenerateHTML {
 	);
 
 	my $filename = $self->{outfile} . ".html";
-	open OUT, "> $filename"
+	open my $OUT, '>', $filename
 			or die "can't open $filename ($!)\n";
-	print OUT $self->{template}->output();
-	close OUT;
+	print $OUT $self->{template}->output();
+	close $OUT;
 
 	$template = "alpha.tmpl";
-	$self->{template} = new HTML::Template(
+	$self->{template} = HTML::Template->new(
 			filename	=> $template,
 			path		=> $self->{path_tmpl},
 	);
@@ -1200,13 +1247,13 @@ sub GenerateHTML {
 	$self->generateExampleIndex();
 
 	$filename = $self->{outfile} . ".alpha.html";
-	open OUT, "> $filename"
+	open $OUT, '>', $filename
 			or die "can't open $filename ($!)\n";
-	print OUT $self->{template}->output();
-	close OUT;
+	print $OUT $self->{template}->output();
+	close $OUT;
 
 	$template = "tree.tmpl";
-	$self->{template} = new HTML::Template(
+	$self->{template} = HTML::Template->new(
 			filename	=> $template,
 			path		=> $self->{path_tmpl},
 	);
@@ -1222,13 +1269,13 @@ sub GenerateHTML {
 	$self->generateTree();
 
 	$filename = $self->{outfile} . ".tree.html";
-	open OUT, "> $filename"
+	open $OUT, '>', $filename
 			or die "can't open $filename ($!)\n";
-	print OUT $self->{template}->output();
-	close OUT;
+	print $OUT $self->{template}->output();
+	close $OUT;
 
 	$template = "main.tmpl";
-	$self->{template} = new HTML::Template(
+	$self->{template} = HTML::Template->new(
 			filename	=> $template,
 			path		=> $self->{path_tmpl},
 	);
@@ -1246,15 +1293,19 @@ sub GenerateHTML {
 	$self->generateExample();
 
 	$filename = $self->{outfile} . ".main.html";
-	open OUT, "> $filename"
+	open $OUT, '>', $filename
 			or die "can't open $filename ($!)\n";
-	print OUT $self->{template}->output();
-	close OUT;
+	print $OUT $self->{template}->output();
+	close $OUT;
+	return;
 }
 
 ###############################################################################
 
 package XML::Handler::Dtd2Html::DocumentBook;
+
+use strict;
+use warnings;
 
 use base qw(XML::Handler::Dtd2Html::Document);
 
@@ -1408,6 +1459,7 @@ sub _test_sensitive {
 		$self->{not_sensitive} = 1;
 	}
 	unlink $filename;
+	return;
 }
 
 sub _mk_filename {
@@ -1424,7 +1476,7 @@ sub copyPNG {
 	use File::Copy;
 
 	my $path = ${$self->{path_tmpl}}[-1];
-	foreach my $img qw(next up home prev) {
+	foreach my $img (qw(next up home prev)) {
 		my $infile = $path . "/" . $img .".png";
 		my $outfile = $self->{dirname} . "/" . $img . ".png";
 		unless ( -e $infile) {
@@ -1436,6 +1488,7 @@ sub copyPNG {
 			warn "$outfile is not copied.\n";
 		}
 	}
+	return;
 }
 
 sub GenerateHTML {
@@ -1454,7 +1507,7 @@ sub GenerateHTML {
 	$self->copyPNG();
 
 	my $template = "book.tmpl";
-	$self->{template} = new HTML::Template(
+	$self->{template} = HTML::Template->new(
 			filename	=> $template,
 			path		=> $self->{path_tmpl},
 	);
@@ -1486,13 +1539,13 @@ sub GenerateHTML {
 	$self->generateTree();
 
 	my $filename = $self->_mk_outfile("book", "home");
-	open OUT, "> $filename"
+	open my $OUT, '>', $filename
 			or die "can't open $filename ($!)\n";
-	print OUT $self->{template}->output();
-	close OUT;
+	print $OUT $self->{template}->output();
+	close $OUT;
 
 	$template = "prolog.tmpl";
-	$self->{template} = new HTML::Template(
+	$self->{template} = HTML::Template->new(
 			filename	=> $template,
 			path		=> $self->{path_tmpl},
 	);
@@ -1525,13 +1578,13 @@ sub GenerateHTML {
 	);
 
 	$filename = $self->_mk_outfile("book", "prolog");
-	open OUT, "> $filename"
+	open $OUT, '>', $filename
 			or die "can't open $filename ($!)\n";
-	print OUT $self->{template}->output();
-	close OUT;
+	print $OUT $self->{template}->output();
+	close $OUT;
 
 	$template = "index.tmpl";
-	$self->{template} = new HTML::Template(
+	$self->{template} = HTML::Template->new(
 			filename	=> $template,
 			path		=> $self->{path_tmpl},
 	);
@@ -1563,14 +1616,14 @@ sub GenerateHTML {
 	my @elements = sort keys %{$self->{hash_element}};
 
 	$filename = $self->_mk_outfile("book", "elements_index");
-	open OUT, "> $filename"
+	open $OUT, '>', $filename
 			or die "can't open $filename ($!)\n";
-	print OUT $self->{template}->output();
-	close OUT;
+	print $OUT $self->{template}->output();
+	close $OUT;
 
 	if (scalar @elements) {
 		$template = "element.tmpl";
-		$self->{template} = new HTML::Template(
+		$self->{template} = HTML::Template->new(
 				filename	=> $template,
 				path		=> $self->{path_tmpl},
 				loop_context_vars	=> 1,
@@ -1625,16 +1678,16 @@ sub GenerateHTML {
 			);
 
 			$filename = $self->_mk_outfile($type_n, $name);
-			open OUT, "> $filename"
+			open $OUT, '>', $filename
 					or die "can't open $filename ($!)\n";
-			print OUT $self->{template}->output();
-			close OUT;
+			print $OUT $self->{template}->output();
+			close $OUT;
 			$first = 0;
 		}
 	}
 
 	$template = "index.tmpl";
-	$self->{template} = new HTML::Template(
+	$self->{template} = HTML::Template->new(
 			filename	=> $template,
 			path		=> $self->{path_tmpl},
 	);
@@ -1666,14 +1719,14 @@ sub GenerateHTML {
 	$self->generateAlphaEntity("nb", "a_link", 1);
 
 	$filename = $self->_mk_outfile("book","entities_index");
-	open OUT, "> $filename"
+	open $OUT, '>', $filename
 			or die "can't open $filename ($!)\n";
-	print OUT $self->{template}->output();
-	close OUT;
+	print $OUT $self->{template}->output();
+	close $OUT;
 
 	if (scalar @entities) {
 		$template = "entity.tmpl";
-		$self->{template} = new HTML::Template(
+		$self->{template} = HTML::Template->new(
 				filename	=> $template,
 				path		=> $self->{path_tmpl},
 		);
@@ -1722,16 +1775,16 @@ sub GenerateHTML {
 			);
 
 			$filename = $self->_mk_outfile($type_n, $_);
-			open OUT, "> $filename"
+			open $OUT, '>', $filename
 					or die "can't open $filename ($!)\n";
-			print OUT $self->{template}->output();
-			close OUT;
+			print $OUT $self->{template}->output();
+			close $OUT;
 			$first = 0;
 		}
 	}
 
 	$template = "index.tmpl";
-	$self->{template} = new HTML::Template(
+	$self->{template} = HTML::Template->new(
 			filename	=> $template,
 			path		=> $self->{path_tmpl},
 	);
@@ -1763,14 +1816,14 @@ sub GenerateHTML {
 	$self->generateAlphaNotation("nb", "a_link", 1);
 
 	$filename = $self->_mk_outfile("book", "notations_index");
-	open OUT, "> $filename"
+	open $OUT, '>', $filename
 			or die "can't open $filename ($!)\n";
-	print OUT $self->{template}->output();
-	close OUT;
+	print $OUT $self->{template}->output();
+	close $OUT;
 
 	if (scalar @notations) {
 		$template = "notation.tmpl";
-		$self->{template} = new HTML::Template(
+		$self->{template} = HTML::Template->new(
 				filename	=> $template,
 				path		=> $self->{path_tmpl},
 		);
@@ -1818,16 +1871,16 @@ sub GenerateHTML {
 			);
 
 			$filename = $self->_mk_outfile($type_n, $_);
-			open OUT, "> $filename"
+			open $OUT, '>', $filename
 					or die "can't open $filename ($!)\n";
-			print OUT $self->{template}->output();
-			close OUT;
+			print $OUT $self->{template}->output();
+			close $OUT;
 			$first = 0;
 		}
 	}
 
 	$template = "index.tmpl";
-	$self->{template} = new HTML::Template(
+	$self->{template} = HTML::Template->new(
 			filename	=> $template,
 			path		=> $self->{path_tmpl},
 	);
@@ -1859,14 +1912,14 @@ sub GenerateHTML {
 	$self->generateExampleIndex("nb", "a_link");
 
 	$filename = $self->_mk_outfile("book", "examples_list");
-	open OUT, "> $filename"
+	open $OUT, '>', $filename
 			or die "can't open $filename ($!)\n";
-	print OUT $self->{template}->output();
-	close OUT;
+	print $OUT $self->{template}->output();
+	close $OUT;
 
 	if (scalar @examples) {
 		$template = "example.tmpl";
-		$self->{template} = new HTML::Template(
+		$self->{template} = HTML::Template->new(
 				filename	=> $template,
 				path		=> $self->{path_tmpl},
 		);
@@ -1907,14 +1960,14 @@ sub GenerateHTML {
 			);
 
 			$filename = $self->_mk_outfile($type_n, $example);
-			open OUT, "> $filename"
+			open $OUT, '>', $filename
 					or die "can't open $filename ($!)\n";
-			print OUT $self->{template}->output();
-			close OUT;
+			print $OUT $self->{template}->output();
+			close $OUT;
 			$first = 0;
 		}
 	}
-
+	return;
 }
 
 1;
@@ -1930,9 +1983,9 @@ XML::Handler::Dtd2Html - SAX2 handler for generate a HTML documentation from a D
   use XML::SAX::Expat;
   use XML::Handler::Dtd2Html;
 
-  $handler = new XML::Handler::Dtd2Html;
+  $handler = XML::Handler::Dtd2Html->new();
 
-  $parser = new XML::SAX::Expat(Handler => $handler);
+  $parser = XML::SAX::Expat->new(Handler => $handler);
   $parser->set_feature("http://xml.org/sax/features/external-general-entities", 1);
   $doc = $parser->parse( [OPTIONS] );
 

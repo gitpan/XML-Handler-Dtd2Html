@@ -1,6 +1,7 @@
 #!/usr/bin/perl -w
 
 use strict;
+use warnings;
 
 use Getopt::Std;
 use Pod::Usage;
@@ -28,24 +29,24 @@ die "No input file\n"
 		unless (defined $file);
 warn "Don't use directly a DTD file (see the embedded pod or the README).\n"
 		if ($file =~ /\.dtd$/i);
-my $io = new IO::File($file,"r");
+my $io = IO::File->new($file,'r');
 die "Can't open $file ($!)\n"
 		unless (defined $io);
 
 if (exists $opts{d}) {
 	if (exists $opts{o}) {
 		my $outfile = $opts{o};
-		open STDOUT, "> $outfile"
+		open STDOUT, '>', $outfile
 				or die "can't open $outfile ($!).\n";
 	}
-	my $handler = new XML::SAX::Writer(Writer => 'DtdWriter', Output => \*STDOUT);
-	my $parser = new XML::SAX::Expat(Handler => $handler);
-	$parser->set_feature("http://xml.org/sax/features/external-general-entities", 1);
+	my $handler = XML::SAX::Writer->new(Writer => 'DtdWriter', Output => \*STDOUT);
+	my $parser = XML::SAX::Expat->new(Handler => $handler);
+	$parser->set_feature('http://xml.org/sax/features/external-general-entities', 1);
 	$parser->parse(Source => {ByteStream => $io});
 } else {
-	my $handler = new XML::Handler::Dtd2Html();
-	my $parser = new XML::SAX::Expat(Handler => $handler);
-	$parser->set_feature("http://xml.org/sax/features/external-general-entities", 1);
+	my $handler = XML::Handler::Dtd2Html->new();
+	my $parser = XML::SAX::Expat->new(Handler => $handler);
+	$parser->set_feature('http://xml.org/sax/features/external-general-entities', 1);
 	my $doc = $parser->parse(Source => {ByteStream => $io});
 
 	my $outfile;
@@ -54,16 +55,16 @@ if (exists $opts{d}) {
 	} else {
 		my $root = $doc->{root_name};
 		$root =~ s/[:\.\-]/_/g;
-		$outfile = "dtd_" . $root;
+		$outfile = 'dtd_' . $root;
 	}
 
 	my @examples = ();
 	@examples = split /\s+/, $opts{x} if (exists $opts{x});
 
 	if      ($opts{b}) {
-		bless($doc, "XML::Handler::Dtd2Html::DocumentBook");
+		bless($doc, 'XML::Handler::Dtd2Html::DocumentBook');
 	} elsif ($opts{f}) {
-		bless($doc, "XML::Handler::Dtd2Html::DocumentFrame");
+		bless($doc, 'XML::Handler::Dtd2Html::DocumentFrame');
 	}
 
 	$doc->GenerateHTML(
@@ -101,6 +102,7 @@ sub start_dtd {
     my $self = shift;
 
     $self->{BufferDTD} = '';
+    return;
 }
 
 sub end_dtd {
@@ -110,6 +112,7 @@ sub end_dtd {
     $dtd = $self->{Encoder}->convert($dtd);
     $self->{Consumer}->output($dtd);
     $self->{BufferDTD} = '';
+    return;
 }
 
 __END__

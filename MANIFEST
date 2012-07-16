@@ -50,3 +50,4 @@ fr/notation.tmpl
 fr/prolog.tmpl
 fr/simple.tmpl
 fr/tree.tmpl
+META.yml                                 Module meta-data (added by MakeMaker)
